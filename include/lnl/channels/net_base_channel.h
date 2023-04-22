@@ -12,6 +12,8 @@ namespace lnl {
 
         virtual bool process_packet(net_packet* packet) = 0;
 
+        //virtual bool send_next_packets() = 0;
+
     protected:
         void add_to_peer_channel_send_queue();
 

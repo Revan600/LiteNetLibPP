@@ -34,6 +34,8 @@ namespace lnl {
         size_t m_size = 0;
         net_packet* m_next = nullptr;
     public:
+        void* user_data = nullptr;
+
         net_packet() {
             ensure(net_constants::MAX_PACKET_SIZE);
             m_size = net_constants::MAX_PACKET_SIZE;
@@ -71,6 +73,15 @@ namespace lnl {
         template <typename T>
         T get_value_at(size_t position) const {
             return *(T*) &m_data[position];
+        }
+
+        template <typename T>
+        void set_value_at(T&& value, size_t position) const {
+            *(T*) &m_data[position] = value;
+        }
+
+        void copy_from(uint8_t* src, size_t srcOffset, size_t position, size_t size) {
+            memcpy(&m_data[position], &src[srcOffset], size);
         }
 
         [[nodiscard]] PACKET_PROPERTY property() const {

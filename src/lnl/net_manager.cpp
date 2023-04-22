@@ -6,7 +6,9 @@
 #include <MSWSock.h>
 #include <ws2ipdef.h>
 
-lnl::net_manager::net_manager() = default;
+lnl::net_manager::net_manager() {
+    m_peers_array.resize(32);
+}
 
 lnl::net_manager::~net_manager() {
     m_running = false;
@@ -153,8 +155,18 @@ void lnl::net_manager::receive_logic() {
 }
 
 void lnl::net_manager::update_logic() {
-    while (m_running) {
+    std::vector<net_address> peersToRemove;
+    net_stopwatch stopwatch;
+    stopwatch.start();
 
+    while (m_running) {
+        auto elapsed = stopwatch.milliseconds();
+        elapsed = elapsed <= 0 ? 1 : elapsed;
+        stopwatch.restart();
+
+        for (auto& it: m_peers) {
+
+        }
     }
 }
 
@@ -516,7 +528,23 @@ std::shared_ptr<lnl::net_peer> lnl::net_manager::on_connection_solved(
 void lnl::net_manager::add_peer(std::shared_ptr<net_peer>& peer) {
     net_mutex_guard guard(m_peers_mutex);
 
+    if (m_head_peer) {
+        peer->m_next_peer = m_head_peer;
+        m_head_peer->m_prev_peer = peer;
+    }
+
+    m_head_peer = peer;
     m_peers.emplace(peer->endpoint(), peer);
+
+    if (peer->m_id >= m_peers_array.size()) {
+        auto newSize = m_peers_array.size() * 2;
+        while (peer->m_id >= newSize) {
+            newSize *= 2;
+        }
+        m_peers_array.resize(newSize);
+    }
+
+    m_peers_array[peer->m_id] = peer;
 }
 
 void lnl::net_manager::disconnect_peer(std::shared_ptr<net_peer>& peer, lnl::DISCONNECT_REASON reason,
@@ -541,16 +569,7 @@ void lnl::net_manager::disconnect_peer(std::shared_ptr<net_peer>& peer, lnl::DIS
 }
 
 void lnl::net_manager::connection_latency_updated(const net_address& address, int32_t latency) {
-    std::shared_ptr<net_peer> peer;
-
-    {
-        net_mutex_guard guard(m_peers_mutex);
-        auto it = m_peers.find(address);
-
-        if (it != m_peers.end()) {
-            peer = it->second;
-        }
-    }
+    std::shared_ptr<net_peer> peer = try_get_peer(address);
 
     if (!peer) {
         return;
@@ -567,4 +586,82 @@ void lnl::net_manager::connection_latency_updated(const net_address& address, in
 void lnl::net_manager::create_receive_event(lnl::net_packet* packet, lnl::DELIVERY_METHOD method, uint8_t channelNumber,
                                             size_t headerSize, const lnl::net_address& endpoint) {
     pool_recycle(packet);
+}
+
+void lnl::net_manager::message_delivered(const lnl::net_address& address, void* userData) {
+    std::shared_ptr<net_peer> peer = try_get_peer(address);
+
+    if (!peer) {
+        return;
+    }
+
+    net_event_create_args messageDeliveredEvent{};
+    messageDeliveredEvent.type = NET_EVENT_TYPE::MESSAGE_DELIVERED;
+    messageDeliveredEvent.peer = peer;
+
+    create_event(messageDeliveredEvent);
+}
+
+void lnl::net_manager::remove_peer(const lnl::net_address& address) {
+    net_mutex_guard guard(m_peers_mutex);
+    remove_peer_internal(address);
+}
+
+std::shared_ptr<lnl::net_peer> lnl::net_manager::try_get_peer(const lnl::net_address& endpoint) {
+    static std::shared_ptr<net_peer> NULL_PEER(nullptr);
+
+    net_mutex_guard guard(m_peers_mutex);
+
+    auto it = m_peers.find(endpoint);
+
+    if (it == m_peers.end()) {
+        return NULL_PEER;
+    }
+
+    return it->second;
+}
+
+void lnl::net_manager::remove_peer_internal(const lnl::net_address& address) {
+    std::shared_ptr<net_peer> peer;
+
+    auto it = m_peers.find(address);
+
+    if (it != m_peers.end()) {
+        peer = it->second;
+    }
+
+    if (m_peers.erase(address) == 0) {
+        return;
+    }
+
+    if (!peer) {
+        return;
+    }
+
+    if (m_head_peer == peer) {
+        m_head_peer = peer->m_next_peer;
+    }
+
+    if (peer->m_prev_peer) {
+        peer->m_prev_peer->m_next_peer = peer->m_next_peer;
+    }
+
+    if (peer->m_next_peer) {
+        peer->m_next_peer->m_prev_peer = peer->m_prev_peer;
+    }
+
+    peer->m_prev_peer = nullptr;
+
+    m_peers_array[peer->m_id] = nullptr;
+    m_peer_ids.push(peer->m_id);
+}
+
+int32_t lnl::net_manager::get_next_peer_id() {
+    auto result = m_peer_ids.dequeue();
+
+    if (result) {
+        return *result;
+    }
+
+    return m_peer_id_counter++;
 }

@@ -1,19 +1,31 @@
 #pragma once
 
 #include <lnl/channels/net_base_channel.h>
+#include <memory>
 
 namespace lnl {
     class net_sequenced_channel final : public net_base_channel {
     public:
-        net_sequenced_channel(net_peer* mPeer, bool mOrdered, uint8_t mId) : net_base_channel(mPeer),
-                                                                             m_ordered(mOrdered), m_id(mId) {}
+        net_sequenced_channel(net_peer* peer, bool reliable, uint8_t id)
+                : net_base_channel(peer),
+                  m_reliable(reliable), m_id(id) {
+            if (!reliable) {
+                return;
+            }
 
-        bool process_packet(net_packet* packet) override {
-            return false;
+            m_ack_packet = std::make_unique<net_packet>(PACKET_PROPERTY::ACK, 0);
         }
 
+        bool process_packet(net_packet* packet) override;
+
     private:
-        bool m_ordered;
+        bool m_reliable;
         uint8_t m_id;
+
+        int32_t m_local_sequence = 0;
+        uint16_t m_remote_sequence = 0;
+        std::unique_ptr<net_packet> m_ack_packet;
+        net_packet* m_last_packet = nullptr;
+        bool m_must_send_ack = false;
     };
 }

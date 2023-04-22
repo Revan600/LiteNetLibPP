@@ -2,16 +2,20 @@
 
 #include <lnl/net_address.h>
 #include <lnl/net_mutex.h>
+#include <lnl/net_queue.h>
 #include <lnl/net_constants.h>
+#include <lnl/net_stopwatch.h>
 #include <lnl/channels/net_base_channel.h>
 #include <lnl/packets/net_connect_request_packet.h>
 #include <atomic>
-#include <chrono>
 #include <memory>
 #include <unordered_map>
 
 namespace lnl {
     class net_peer {
+        std::shared_ptr<net_peer> m_next_peer;
+        std::shared_ptr<net_peer> m_prev_peer;
+
         int32_t m_id;
         net_address m_endpoint;
 
@@ -27,7 +31,7 @@ namespace lnl {
         bool m_finish_mtu = false;
 
         //ping at rtt
-        std::chrono::time_point<std::chrono::steady_clock> m_ping_timer;
+        net_stopwatch m_ping_timer;
         int64_t m_remote_delta = 0;
         int32_t m_rtt = 0;
         int32_t m_avg_rtt = 0;
@@ -42,6 +46,9 @@ namespace lnl {
         net_packet m_pong_packet;
         net_packet m_ping_packet;
 
+        //channels
+        std::queue<net_packet*> m_unreliable_channel;
+        net_queue<net_base_channel*> m_channel_send_queue;
         std::vector<class net_base_channel*> m_channels;
 
         //fragment
@@ -55,6 +62,11 @@ namespace lnl {
         int32_t m_fragment_id = 0;
         std::unordered_map<uint16_t, incoming_fragments> m_holded_fragments;
         std::unordered_map<uint16_t, uint16_t> m_delivered_fragments;
+
+        //merging
+        net_packet m_merge_data;
+        size_t m_merge_pos = 0;
+        int32_t m_merge_count = 0;
 
     protected:
         class net_manager* m_net_manager;
@@ -126,8 +138,20 @@ namespace lnl {
 
         void send_user_data(net_packet* packet);
 
+        void send_merged();
+
+        void recycle_and_deliver(net_packet* packet);
+
+        void add_to_reliable_channel_send_queue(net_base_channel* channel) {
+            m_channel_send_queue.push(channel);
+        }
+
         friend class net_manager;
 
+        friend class net_base_channel;
+
         friend class net_reliable_channel;
+
+        friend class net_sequenced_channel;
     };
 }

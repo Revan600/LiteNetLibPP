@@ -160,9 +160,8 @@ void lnl::net_peer::process_packet(lnl::net_packet* packet) {
 
         case PACKET_PROPERTY::PONG: {
             if (packet->sequence() == m_ping_packet.sequence()) {
-                auto current = std::chrono::high_resolution_clock::now();
-                auto elapsedMs = (int32_t) std::chrono::duration_cast<std::chrono::milliseconds>(
-                        current - m_ping_timer).count();
+                m_ping_timer.stop();
+                auto elapsedMs = m_ping_timer.milliseconds();
                 m_remote_delta = *(int64_t*) &packet->data()[3] +
                                  (elapsedMs * TICKS_PER_MILLISECOND) / 2 -
                                  get_current_time();
@@ -219,8 +218,9 @@ void lnl::net_peer::update_roundtrip_time(int32_t roundTripTime) {
     m_resend_delay = 25. + m_avg_rtt * 2.1;
 }
 
-lnl::net_peer::net_peer(lnl::net_manager* netManager, const lnl::net_address& endpoint, int32_t id) : m_pong_packet(
-        PACKET_PROPERTY::PONG, 0) {
+lnl::net_peer::net_peer(lnl::net_manager* netManager, const lnl::net_address& endpoint, int32_t id)
+        : m_pong_packet(PACKET_PROPERTY::PONG, 0),
+          m_merge_data(PACKET_PROPERTY::MERGED, net_constants::MAX_PACKET_SIZE) {
     m_id = id;
     m_endpoint = endpoint;
     m_net_manager = netManager;
@@ -421,5 +421,56 @@ void lnl::net_peer::send_user_data(lnl::net_packet* packet) {
         send_merged();
     }
 
+    m_merge_data.set_value_at((uint16_t) packet->size(), m_merge_pos + net_constants::HEADER_SIZE);
+    m_merge_data.copy_from(packet->data(), 0, m_merge_pos + net_constants::HEADER_SIZE + 2, packet->size());
+    m_merge_pos += packet->size() + 2;
+    m_merge_count++;
+}
 
+void lnl::net_peer::send_merged() {
+    if (m_merge_count == 0) {
+        return;
+    }
+
+    size_t offset = 0;
+    size_t size = 0;
+
+    if (m_merge_count > 1) {
+        offset = 0;
+        size = net_constants::HEADER_SIZE + m_merge_pos;
+    } else {
+        offset = net_constants::HEADER_SIZE + 2;
+        size = m_merge_pos - 2;
+    }
+
+    m_net_manager->send_raw(m_merge_data.data(), offset, size, m_endpoint);
+
+    m_merge_pos = 0;
+    m_merge_count = 0;
+}
+
+void lnl::net_peer::recycle_and_deliver(lnl::net_packet* packet) {
+    if (packet->user_data == nullptr) {
+        m_net_manager->pool_recycle(packet);
+        return;
+    }
+
+    if (packet->is_fragmented()) {
+        auto it = m_delivered_fragments.find(packet->fragment_id());
+
+        if (it != m_delivered_fragments.end()) {
+            auto& fragCount = it->second;
+            fragCount++;
+
+            if (fragCount == packet->total_fragments()) {
+                m_net_manager->message_delivered(m_endpoint, packet->user_data);
+                m_delivered_fragments.erase(packet->fragment_id());
+            }
+        }
+    } else {
+        m_net_manager->message_delivered(m_endpoint, packet->user_data);
+    }
+
+    packet->user_data = nullptr;
+    m_net_manager->pool_recycle(packet);
 }

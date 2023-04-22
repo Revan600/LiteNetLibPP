@@ -91,11 +91,15 @@ namespace lnl {
                                                        const std::optional<std::vector<uint8_t>>& rejectData,
                                                        size_t offset, size_t size);
 
-        int32_t get_next_peer_id() {
-            return m_peer_id_counter++;
-        }
+        int32_t get_next_peer_id();
+
+        std::shared_ptr<net_peer> try_get_peer(const net_address& endpoint);
 
         void add_peer(std::shared_ptr<net_peer>& peer);
+
+        void remove_peer(const net_address& address);
+
+        void remove_peer_internal(const net_address& address);
 
         void disconnect_peer_force(std::shared_ptr<net_peer>& peer,
                                    DISCONNECT_REASON reason,
@@ -115,6 +119,8 @@ namespace lnl {
 
         void create_receive_event(net_packet* packet, DELIVERY_METHOD method, uint8_t channelNumber, size_t headerSize,
                                   const net_address& endpoint);
+
+        void message_delivered(const net_address& address, void* userData);
 
         //send methods
         int32_t send_raw_and_recycle(net_packet* packet, net_address& endpoint);
@@ -139,7 +145,10 @@ namespace lnl {
         size_t m_packet_pool_size = 0;
 
         net_mutex m_peers_mutex;
+        std::shared_ptr<net_peer> m_head_peer;
         std::unordered_map<net_address, std::shared_ptr<net_peer>, net_address_hash> m_peers;
+        std::vector<std::shared_ptr<net_peer>> m_peers_array;
+        net_queue<int32_t> m_peer_ids;
         std::atomic<int32_t> m_peer_id_counter = 0;
 
         net_mutex m_connection_requests_mutex;
@@ -148,5 +157,7 @@ namespace lnl {
         friend class net_connection_request;
 
         friend class net_peer;
+
+        friend class net_sequenced_channel;
     };
 }
