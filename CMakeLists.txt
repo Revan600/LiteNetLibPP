@@ -12,6 +12,3 @@ add_executable(lnl ${sources})
 target_include_directories(lnl PRIVATE ${CMAKE_SOURCE_DIR}/include)
 add_compile_definitions(WIN32_LEAN_AND_MEAN)
 target_link_libraries(lnl PRIVATE wsock32 ws2_32)
-
-find_package(fmt CONFIG REQUIRED)
-target_link_libraries(lnl PRIVATE fmt::fmt)

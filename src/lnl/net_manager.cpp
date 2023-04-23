@@ -30,14 +30,14 @@ bool lnl::net_manager::start(const sockaddr_in& addr) {
     auto result = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
     if (result != 0) {
-        m_logger.log("WSAStartup failed with error: {0}", result);
+        m_logger.log("WSAStartup failed with error: %p", result);
         return false;
     }
 
     m_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
     if (m_socket == INVALID_SOCKET) {
-        m_logger.log("Failed to create socket with error: {0}", WSAGetLastError());
+        m_logger.log("Failed to create socket with error: %p", WSAGetLastError());
         return false;
     }
 
@@ -58,22 +58,22 @@ bool lnl::net_manager::bind_socket(const sockaddr_in& addr) {
     DWORD timeout = 500;
 
     if (!set_socket_option(SOL_SOCKET, SO_RCVTIMEO, timeout)) {
-        m_logger.log("Cannot set SO_RCVTIMEO to {0}", timeout);
+        m_logger.log("Cannot set SO_RCVTIMEO to %lu", timeout);
         return false;
     }
 
     if (!set_socket_option(SOL_SOCKET, SO_SNDTIMEO, timeout)) {
-        m_logger.log("Cannot set SO_SNDTIMEO to {0}", timeout);
+        m_logger.log("Cannot set SO_SNDTIMEO to %lu", timeout);
         return false;
     }
 
     if (!set_socket_option(SOL_SOCKET, SO_RCVBUF, net_constants::SOCKET_BUFFER_SIZE)) {
-        m_logger.log("Cannot set SO_RCVBUF to {0}", net_constants::SOCKET_BUFFER_SIZE);
+        m_logger.log("Cannot set SO_RCVBUF to %lu", net_constants::SOCKET_BUFFER_SIZE);
         return false;
     }
 
     if (!set_socket_option(SOL_SOCKET, SO_SNDBUF, net_constants::SOCKET_BUFFER_SIZE)) {
-        m_logger.log("Cannot set SO_SNDBUF to {0}", net_constants::SOCKET_BUFFER_SIZE);
+        m_logger.log("Cannot set SO_SNDBUF to %lu", net_constants::SOCKET_BUFFER_SIZE);
         return false;
     }
 
@@ -89,23 +89,23 @@ bool lnl::net_manager::bind_socket(const sockaddr_in& addr) {
                  &bytesReturned,
                  nullptr,
                  nullptr) != 0) {
-        m_logger.log("Cannot set SIO_UDP_CONNRESET to false: {0}", WSAGetLastError());
+        m_logger.log("Cannot set SIO_UDP_CONNRESET to false: %p", WSAGetLastError());
         return false;
     }
 #endif
 
     if (!set_socket_option(SOL_SOCKET, SO_EXCLUSIVEADDRUSE, !reuse_address)) {
-        m_logger.log("Cannot set SO_EXCLUSIVEADDRUSE to {0}", !reuse_address);
+        m_logger.log("Cannot set SO_EXCLUSIVEADDRUSE to %d", !reuse_address);
         return false;
     }
 
     if (!set_socket_option(SOL_SOCKET, SO_REUSEADDR, reuse_address)) {
-        m_logger.log("Cannot set SO_REUSEADDR to {0}", reuse_address);
+        m_logger.log("Cannot set SO_REUSEADDR to %d", reuse_address);
         return false;
     }
 
     if (!set_socket_option(IPPROTO_IP, IP_TTL, net_constants::SOCKET_TTL)) {
-        m_logger.log("Cannot set IP_TTL to {0}", net_constants::SOCKET_TTL);
+        m_logger.log("Cannot set IP_TTL to %i", net_constants::SOCKET_TTL);
         return false;
     }
 
@@ -122,7 +122,7 @@ bool lnl::net_manager::bind_socket(const sockaddr_in& addr) {
 #endif
 
     if (bind(m_socket, (sockaddr*) &addr, sizeof addr) == SOCKET_ERROR) {
-        m_logger.log("Bind failed: {0}", WSAGetLastError());
+        m_logger.log("Bind failed: %p", WSAGetLastError());
         return false;
     }
 
@@ -144,7 +144,7 @@ void lnl::net_manager::receive_logic() {
                              0, (sockaddr*) &addr.raw, &addrLen);
 
         if (size == SOCKET_ERROR) {
-            m_logger.log("recvfrom failed: {0}", WSAGetLastError());
+            m_logger.log("recvfrom failed: %p", WSAGetLastError());
             continue;
         }
 
@@ -446,7 +446,7 @@ int32_t lnl::net_manager::send_raw(const uint8_t* data, size_t offset, size_t le
 
     if (result == SOCKET_ERROR) {
 #ifndef NDEBUG
-        m_logger.log("sendto failed: {0}", WSAGetLastError());
+        m_logger.log("sendto failed: %p", WSAGetLastError());
 #endif
         //todo: implement disconnect and other shit
         return 0;
@@ -512,7 +512,7 @@ void lnl::net_manager::process_connect_request(lnl::net_address& addr,
                                                     net_constants::MAX_CONNECTION_NUMBER);
         }
     } else {
-        m_logger.log("ConnectRequest Id: {0}, EP: {1}", request->connection_time, addr.to_string());
+        m_logger.log("ConnectRequest Id: %lld, EP: %s", request->connection_time, addr.to_string().c_str());
     }
 
     std::shared_ptr<net_connection_request> req;
@@ -531,7 +531,7 @@ void lnl::net_manager::process_connect_request(lnl::net_address& addr,
         req = pair.first->second;
     }
 
-    m_logger.log("Creating request event: {0}", req->m_internal_packet->connection_time);
+    m_logger.log("Creating request event: %lld", req->m_internal_packet->connection_time);
 
     net_event_create_args requestEvent{};
     requestEvent.type = NET_EVENT_TYPE::CONNECTION_REQUEST;
@@ -609,7 +609,7 @@ void lnl::net_manager::add_peer(std::shared_ptr<net_peer>& peer) {
 
     m_peers_array[peer->m_id] = peer;
 
-    m_logger.log("Added peer {0} {1}", peer->m_endpoint.to_string(), peer->m_id);
+    m_logger.log("Added peer %s %i", peer->m_endpoint.to_string().c_str(), peer->m_id);
 }
 
 void lnl::net_manager::disconnect_peer(const net_address& address, lnl::DISCONNECT_REASON reason,
@@ -720,7 +720,7 @@ void lnl::net_manager::remove_peer_internal(const lnl::net_address& address) {
         return;
     }
 
-    m_logger.log("Removing {0} {1} peer", peer->endpoint().to_string(), peer->m_id);
+    m_logger.log("Removing %s %i peer", peer->endpoint().to_string().c_str(), peer->m_id);
 
     if (m_head_peer == peer) {
         m_head_peer = peer->m_next_peer;
