@@ -5,7 +5,7 @@
 
 #include <lnl/net_enums.h>
 #include <lnl/packets/net_connect_request_packet.h>
-#include <lnl/net_packet_reader.h>
+#include <lnl/net_data_reader.h>
 #include <lnl/net_peer.h>
 
 namespace lnl {
@@ -31,6 +31,14 @@ namespace lnl {
         std::shared_ptr<net_peer> accept_if_key(const std::string& expectedKey);
 
         std::shared_ptr<net_peer> accept();
+
+        inline void reject() {
+            reject({}, 0, 0, false);
+        }
+
+        inline void reject_force() {
+            reject({}, 0, 0, true);
+        }
 
         void reject(const std::optional<std::vector<uint8_t>>& rejectData,
                     size_t offset, size_t size, bool force);

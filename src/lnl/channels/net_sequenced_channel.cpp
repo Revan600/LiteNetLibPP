@@ -39,3 +39,40 @@ bool lnl::net_sequenced_channel::process_packet(net_packet* packet) {
 
     return packetProcessed;
 }
+
+bool lnl::net_sequenced_channel::send_next_packets() {
+    if (m_reliable && m_outgoing_queue.empty()) {
+        auto currentTime = get_current_time();
+        auto packetHoldTime = currentTime - m_last_packet_send_time;
+
+        if ((double) packetHoldTime >= m_peer->m_resend_delay * TICKS_PER_MILLISECOND) {
+            if (m_last_packet) {
+                m_last_packet_send_time = currentTime;
+                m_peer->send_user_data(m_last_packet);
+            }
+        }
+    } else {
+        std::optional<net_packet*> packet;
+        while ((packet = m_outgoing_queue.dequeue())) {
+            m_local_sequence = (m_local_sequence + 1) % net_constants::MAX_SEQUENCE;
+            packet.value()->set_sequence((uint16_t) m_local_sequence);
+            packet.value()->set_channel_id(m_id);
+            m_peer->send_user_data(packet.value());
+
+            if (m_reliable && m_outgoing_queue.empty()) {
+                m_last_packet_send_time = get_current_time();
+                m_last_packet = packet.value();
+            } else {
+                m_peer->m_net_manager->pool_recycle(packet.value());
+            }
+        }
+    }
+
+    if (m_reliable && m_must_send_ack) {
+        m_must_send_ack = false;
+        m_ack_packet->set_sequence(m_remote_sequence);
+        m_peer->send_user_data(m_ack_packet.get());
+    }
+
+    return m_last_packet != nullptr;
+}

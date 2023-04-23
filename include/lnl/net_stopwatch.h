@@ -9,6 +9,10 @@ namespace lnl {
         decltype(m_start)::duration m_last_time{};
         bool m_running = false;
     public:
+        [[nodiscard]] bool running() const {
+            return m_running;
+        }
+
         void start() {
             if (m_running) {
                 return;
@@ -36,12 +40,16 @@ namespace lnl {
             m_start = std::chrono::high_resolution_clock::now();
         }
 
-        [[maybe_unused]] int32_t milliseconds() const {
+        [[nodiscard]] int32_t milliseconds() const {
+            decltype(m_start)::duration duration;
+
             if (!m_running) {
-                return (int32_t) m_last_time.count();
+                duration = m_last_time;
+            } else {
+                duration = std::chrono::high_resolution_clock::now() - m_start;
             }
 
-            return (int32_t) (std::chrono::high_resolution_clock::now() - m_start).count();
+            return (int32_t) std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
         }
     };
 }

@@ -3,10 +3,10 @@
 #include <lnl/packets/net_connect_request_packet.h>
 #include <lnl/packets/net_connect_accept_packet.h>
 
-#include <MSWSock.h>
-#include <ws2ipdef.h>
+#include <MSWSock.h> //for SIO_UDP_CONNRESET
 
-lnl::net_manager::net_manager() {
+lnl::net_manager::net_manager(net_event_listener* listener)
+        : m_listener(listener) {
     m_peers_array.resize(32);
 }
 
@@ -164,9 +164,31 @@ void lnl::net_manager::update_logic() {
         elapsed = elapsed <= 0 ? 1 : elapsed;
         stopwatch.restart();
 
-        for (auto& it: m_peers) {
-
+        for (auto netPeer = m_head_peer; netPeer; netPeer = netPeer->m_next_peer) {
+            if (netPeer->connection_state() == CONNECTION_STATE::DISCONNECTED &&
+                netPeer->m_time_since_last_packet > disconnect_timeout) {
+                peersToRemove.push_back(netPeer->m_endpoint);
+            } else {
+                netPeer->update(elapsed);
+            }
         }
+
+        if (!peersToRemove.empty()) {
+            net_mutex_guard guard(m_peers_mutex);
+            for (auto& addr: peersToRemove) {
+                remove_peer_internal(addr);
+            }
+            peersToRemove.clear();
+        }
+
+        auto sleepTime = update_time - stopwatch.milliseconds();
+
+        if (sleepTime <= 0) {
+            continue;
+        }
+
+        //consider timeBeginPeriod(1) for win32
+        Sleep(sleepTime);
     }
 }
 
@@ -201,7 +223,7 @@ void lnl::net_manager::pool_recycle(lnl::net_packet* packet) {
         return;
     }
 
-    packet->data()[0] = 0;
+    packet->clear();
 
     {
         net_mutex_guard guard(m_packet_pool_mutex);
@@ -251,8 +273,6 @@ void lnl::net_manager::on_message_received(lnl::net_packet* packet, net_address&
     }
 
     auto property = packet->property();
-
-    m_logger.log("Received packet {0}", (int) property);
 
     switch (property) {
         case PACKET_PROPERTY::CONNECT_REQUEST: {
@@ -328,7 +348,7 @@ void lnl::net_manager::on_message_received(lnl::net_packet* packet, net_address&
                     netPeer->reset_mtu();
                     send_raw_and_recycle(net_connect_accept_packet::make_network_changed(netPeer.get()), addr);
                 } else if (packet->size() == 2 && packet->data()[1] == 1) {
-                    disconnect_peer_force(netPeer, DISCONNECT_REASON::PEER_NOT_FOUND, 0, nullptr);
+                    disconnect_peer_force(netPeer->m_endpoint, DISCONNECT_REASON::PEER_NOT_FOUND, 0, nullptr);
                 } else if (packet->size() > 1) {//remote
                     //todo: implement peer address change
                     pool_recycle(packet);
@@ -343,7 +363,7 @@ void lnl::net_manager::on_message_received(lnl::net_packet* packet, net_address&
 
         case PACKET_PROPERTY::INVALID_PROTOCOL: {
             if (netPeer && netPeer->connection_state() == CONNECTION_STATE::OUTGOING) {
-                disconnect_peer_force(netPeer, DISCONNECT_REASON::INVALID_PROTOCOL, 0, nullptr);
+                disconnect_peer_force(netPeer->m_endpoint, DISCONNECT_REASON::INVALID_PROTOCOL, 0, nullptr);
             }
             break;
         }
@@ -357,7 +377,7 @@ void lnl::net_manager::on_message_received(lnl::net_packet* packet, net_address&
                     return;
                 }
 
-                disconnect_peer_force(netPeer,
+                disconnect_peer_force(netPeer->m_endpoint,
                                       disconnectResult == DISCONNECT_RESULT::DISCONNECT
                                       ? DISCONNECT_REASON::REMOTE_CONNECTION_CLOSE
                                       : DISCONNECT_REASON::CONNECTION_REJECTED, 0, packet);
@@ -435,11 +455,28 @@ int32_t lnl::net_manager::send_raw(const uint8_t* data, size_t offset, size_t le
     return result;
 }
 
-void lnl::net_manager::create_event(lnl::net_event_create_args& args) {
-    m_logger.log("Received event {0}", (int) args.type);
+void lnl::net_manager::create_event(net_event_create_args& args) {
+#define ASSIGN_EVT_FIELD(fld) (evt.fld = args.fld)
 
-    if (args.type == NET_EVENT_TYPE::CONNECTION_REQUEST && args.connectionRequest) {
-        args.connectionRequest->accept();
+    net_event evt(this, args.readerSource);
+    ASSIGN_EVT_FIELD(type);
+    ASSIGN_EVT_FIELD(peer);
+    ASSIGN_EVT_FIELD(remoteAddr);
+    ASSIGN_EVT_FIELD(socketErrorCode);
+    ASSIGN_EVT_FIELD(latency);
+    ASSIGN_EVT_FIELD(disconnectReason);
+    ASSIGN_EVT_FIELD(connectionRequest);
+    ASSIGN_EVT_FIELD(deliveryMethod);
+    ASSIGN_EVT_FIELD(channelNumber);
+    ASSIGN_EVT_FIELD(errorMessage);
+    ASSIGN_EVT_FIELD(userData);
+    ASSIGN_EVT_FIELD(reader);
+
+#undef ASSIGN_EVT_FIELD
+
+    {
+        net_mutex_guard guard(m_events_queue_mutex);
+        m_events_produce_queue.push_back(evt);
     }
 }
 
@@ -447,7 +484,33 @@ void lnl::net_manager::process_connect_request(lnl::net_address& addr,
                                                std::shared_ptr<net_peer>& peer,
                                                std::unique_ptr<net_connect_request_packet>& request) {
     if (peer) {
+        auto processResult = peer->process_connect_request(request);
 
+        switch (processResult) {
+            case CONNECT_REQUEST_RESULT::RECONNECTION: {
+                disconnect_peer_force(addr, DISCONNECT_REASON::RECONNECT, 0, nullptr);
+                remove_peer(addr);
+                break;
+            }
+
+            case CONNECT_REQUEST_RESULT::NEW_CONNECTION: {
+                remove_peer(addr);
+                break;
+            }
+
+            case CONNECT_REQUEST_RESULT::P2P_LOSE: {
+                disconnect_peer_force(addr, DISCONNECT_REASON::PEER_TO_PEER_CONNECTION, 0, nullptr);
+                remove_peer(addr);
+                break;
+            }
+            default:
+                return;
+        }
+
+        if (processResult != CONNECT_REQUEST_RESULT::P2P_LOSE) {
+            request->connection_number = (uint8_t) ((peer->connect_number() + 1) %
+                                                    net_constants::MAX_CONNECTION_NUMBER);
+        }
     } else {
         m_logger.log("ConnectRequest Id: {0}, EP: {1}", request->connection_time, addr.to_string());
     }
@@ -545,12 +608,20 @@ void lnl::net_manager::add_peer(std::shared_ptr<net_peer>& peer) {
     }
 
     m_peers_array[peer->m_id] = peer;
+
+    m_logger.log("Added peer {0} {1}", peer->m_endpoint.to_string(), peer->m_id);
 }
 
-void lnl::net_manager::disconnect_peer(std::shared_ptr<net_peer>& peer, lnl::DISCONNECT_REASON reason,
+void lnl::net_manager::disconnect_peer(const net_address& address, lnl::DISCONNECT_REASON reason,
                                        uint32_t socketErrorCode, bool force,
                                        const std::optional<std::vector<uint8_t>>& rejectData, size_t offset,
                                        size_t size, lnl::net_packet* eventData) {
+    auto peer = try_get_peer(address);
+
+    if (!peer) {
+        return;
+    }
+
     auto shutdownResult = peer->shutdown(rejectData, offset, size, force);
 
     if (shutdownResult == SHUTDOWN_RESULT::NONE) {
@@ -583,9 +654,20 @@ void lnl::net_manager::connection_latency_updated(const net_address& address, in
     create_event(latencyEvent);
 }
 
-void lnl::net_manager::create_receive_event(lnl::net_packet* packet, lnl::DELIVERY_METHOD method, uint8_t channelNumber,
-                                            size_t headerSize, const lnl::net_address& endpoint) {
-    pool_recycle(packet);
+void lnl::net_manager::create_receive_event(lnl::net_packet* packet,
+                                            lnl::DELIVERY_METHOD method,
+                                            uint8_t channelNumber,
+                                            size_t headerSize,
+                                            const lnl::net_address& endpoint) {
+    net_event_create_args args;
+    args.type = NET_EVENT_TYPE::RECEIVE;
+    args.deliveryMethod = method;
+    args.channelNumber = channelNumber;
+    args.peer = try_get_peer(endpoint);
+    args.readerSource = packet;
+    args.reader = std::make_optional<net_data_reader>(packet->data(), packet->size(), headerSize);
+
+    create_event(args);
 }
 
 void lnl::net_manager::message_delivered(const lnl::net_address& address, void* userData) {
@@ -638,6 +720,8 @@ void lnl::net_manager::remove_peer_internal(const lnl::net_address& address) {
         return;
     }
 
+    m_logger.log("Removing {0} {1} peer", peer->endpoint().to_string(), peer->m_id);
+
     if (m_head_peer == peer) {
         m_head_peer = peer->m_next_peer;
     }
@@ -664,4 +748,87 @@ int32_t lnl::net_manager::get_next_peer_id() {
     }
 
     return m_peer_id_counter++;
+}
+
+void lnl::net_manager::poll_events() {
+    {
+        net_mutex_guard guard(m_events_queue_mutex);
+        std::swap(m_events_produce_queue, m_events_consume_queue);
+    }
+
+    for (auto& evt: m_events_consume_queue) {
+        process_event(evt);
+    }
+
+    m_events_consume_queue.clear();
+}
+
+void lnl::net_manager::process_event(lnl::net_event& event) {
+    switch (event.type) {
+        case NET_EVENT_TYPE::CONNECT: {
+            m_listener->on_peer_connected(event.peer);
+            break;
+        }
+
+        case NET_EVENT_TYPE::DISCONNECT: {
+            disconnect_info info;
+            info.reason = event.disconnectReason;
+            info.additional_data = event.reader;
+            info.socket_error_code = event.socketErrorCode;
+            m_listener->on_peer_disconnected(event.peer, info);
+            break;
+        }
+
+        case NET_EVENT_TYPE::RECEIVE: {
+            m_listener->on_network_receive(event.peer, *event.reader, event.channelNumber, event.deliveryMethod);
+            break;
+        }
+
+        case NET_EVENT_TYPE::RECEIVE_UNCONNECTED: {
+            m_listener->on_network_receive_unconnected(event.remoteAddr, *event.reader,
+                                                       UNCONNECTED_MESSAGE_TYPE::BASIC);
+            break;
+        }
+
+        case NET_EVENT_TYPE::BROADCAST: {
+            m_listener->on_network_receive_unconnected(event.remoteAddr, *event.reader,
+                                                       UNCONNECTED_MESSAGE_TYPE::BASIC);
+            break;
+        }
+
+        case NET_EVENT_TYPE::NETWORK_ERROR: {
+            m_listener->on_network_error(event.remoteAddr, event.socketErrorCode, event.errorMessage.value());
+            break;
+        }
+
+        case NET_EVENT_TYPE::CONNECTION_LATENCY_UPDATED: {
+            m_listener->on_network_latency_update(event.peer, event.latency);
+            break;
+        }
+
+        case NET_EVENT_TYPE::CONNECTION_REQUEST: {
+            m_listener->on_connection_request(event.connectionRequest);
+            break;
+        }
+
+        case NET_EVENT_TYPE::MESSAGE_DELIVERED: {
+            m_listener->on_message_delivered(event.peer, event.userData);
+            break;
+        }
+    }
+
+    if (auto_recycle) {
+        event.recycle();
+    }
+
+    assert(event.m_recycled);
+}
+
+void lnl::net_manager::create_error_event(uint32_t socketErrorCode, const std::string& errorMessage) {
+    net_event_create_args args;
+    args.type = NET_EVENT_TYPE::NETWORK_ERROR;
+    args.socketErrorCode = socketErrorCode;
+    args.errorMessage = errorMessage;
+
+    create_event(args);
 }

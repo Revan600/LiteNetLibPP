@@ -45,6 +45,8 @@ namespace lnl {
         bool process_packet(net_packet* packet) override;
 
     private:
+        bool send_next_packets() override;
+
         void process_ack(net_packet* packet);
 
         int32_t m_local_sequence = 0;

@@ -23,6 +23,10 @@ namespace lnl {
             return m_queue.empty();
         }
 
+        [[nodiscard]] size_t size() const {
+            return m_queue.size();
+        }
+
         std::optional<T> dequeue() {
             net_mutex_guard guard(m_mutex);
 

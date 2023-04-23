@@ -3,10 +3,10 @@
 
 lnl::net_packet* lnl::net_connect_accept_packet::make(int64_t connectTime, uint8_t connectNum, int32_t localPeerId) {
     auto packet = new net_packet(PACKET_PROPERTY::CONNECT_ACCEPT, 0);
-    *(int64_t*) &packet->data()[1] = connectTime;
-    packet->data()[9] = connectNum;
-    packet->data()[10] = 0;
-    *(int32_t*) &packet->data()[11] = localPeerId;
+    packet->set_value_at(connectTime, 1);
+    packet->set_value_at(connectNum, 9);
+    packet->set_value_at<uint8_t>(0, 10);
+    packet->set_value_at<uint8_t>(localPeerId, 11);
     return packet;
 }
 

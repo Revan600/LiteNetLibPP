@@ -12,9 +12,24 @@ namespace lnl {
 
         virtual bool process_packet(net_packet* packet) = 0;
 
-        //virtual bool send_next_packets() = 0;
+        bool send_and_check_queue() {
+            auto hasPacketsToSend = send_next_packets();
+
+            if (!hasPacketsToSend) {
+                InterlockedExchange(&m_is_added_to_peer_channel_send_queue, 0);
+            }
+
+            return hasPacketsToSend;
+        }
+
+        void add_to_queue(net_packet* packet) {
+            m_outgoing_queue.push(packet);
+            add_to_peer_channel_send_queue();
+        }
 
     protected:
+        virtual bool send_next_packets() = 0;
+
         void add_to_peer_channel_send_queue();
 
         net_peer* m_peer;

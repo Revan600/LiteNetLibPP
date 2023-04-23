@@ -2,16 +2,13 @@
 
 #include <cstdint>
 
-#pragma push_macro("ERROR")
-#undef ERROR
-
 namespace lnl {
     enum class NET_EVENT_TYPE {
         CONNECT,
         DISCONNECT,
         RECEIVE,
         RECEIVE_UNCONNECTED,
-        ERROR,
+        NETWORK_ERROR,
         CONNECTION_LATENCY_UPDATED,
         BROADCAST,
         CONNECTION_REQUEST,
@@ -97,6 +94,11 @@ namespace lnl {
         REJECT,
         DISCONNECT
     };
-}
 
-#pragma pop_macro("ERROR")
+    enum class CONNECT_REQUEST_RESULT {
+        NONE,
+        P2P_LOSE,
+        RECONNECTION,
+        NEW_CONNECTION
+    };
+}

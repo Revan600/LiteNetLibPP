@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstdint>
 #include <vector>
+#include <type_traits>
 
 #include <lnl/net_constants.h>
 #include <lnl/net_enums.h>
@@ -48,6 +49,10 @@ namespace lnl {
             set_property(property);
         }
 
+        void clear() {
+            memset(m_data.data(), 0, m_data.size());
+        }
+
         [[nodiscard]] const uint8_t* data() const {
             return m_data.data();
         }
@@ -70,6 +75,12 @@ namespace lnl {
             m_size = size;
         }
 
+        void resize(PACKET_PROPERTY property, size_t size) {
+            size += net_packet::get_header_size(property);
+            resize(size);
+            set_property(property);
+        }
+
         template <typename T>
         T get_value_at(size_t position) const {
             return *(T*) &m_data[position];
@@ -77,10 +88,14 @@ namespace lnl {
 
         template <typename T>
         void set_value_at(T&& value, size_t position) const {
-            *(T*) &m_data[position] = value;
+            *(typename std::remove_const<typename std::remove_reference<T>::type>::type*) &m_data[position] = value;
         }
 
-        void copy_from(uint8_t* src, size_t srcOffset, size_t position, size_t size) {
+        void copy_from(const uint8_t* src, size_t srcOffset, size_t position, size_t size) {
+            if (size == 0) {
+                return;
+            }
+
             memcpy(&m_data[position], &src[srcOffset], size);
         }
 
@@ -159,6 +174,10 @@ namespace lnl {
 
         void set_total_fragments(uint16_t value) {
             *(uint16_t*) &m_data[8] = value;
+        }
+
+        void mark_fragmented() {
+            m_data[0] |= 0x80;
         }
 
     private:

@@ -34,5 +34,10 @@ std::shared_ptr<lnl::net_peer> lnl::net_connection_request::accept() {
 void lnl::net_connection_request::reject(const std::optional<std::vector<uint8_t>>& rejectData,
                                          size_t offset, size_t size,
                                          bool force) {
+    if (!try_activate()) {
+        return;
+    }
 
+    m_result = force ? CONNECTION_REQUEST_RESULT::REJECT_FORCE : CONNECTION_REQUEST_RESULT::REJECT;
+    m_listener->on_connection_solved(this, rejectData, offset, size);
 }

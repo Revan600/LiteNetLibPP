@@ -19,6 +19,8 @@ namespace lnl {
         bool process_packet(net_packet* packet) override;
 
     private:
+        bool send_next_packets() override;
+
         bool m_reliable;
         uint8_t m_id;
 
@@ -26,6 +28,7 @@ namespace lnl {
         uint16_t m_remote_sequence = 0;
         std::unique_ptr<net_packet> m_ack_packet;
         net_packet* m_last_packet = nullptr;
+        int64_t m_last_packet_send_time = 0;
         bool m_must_send_ack = false;
     };
 }

@@ -119,6 +119,7 @@ void lnl::net_reliable_channel::process_ack(lnl::net_packet* packet) {
     }
 
     net_mutex_guard guard(m_pending_packets_mutex);
+
     for (auto pendingSeq = m_local_window_start;
          pendingSeq != m_local_sequence;
          pendingSeq = (pendingSeq + 1) % net_constants::MAX_SEQUENCE) {
@@ -142,6 +143,50 @@ void lnl::net_reliable_channel::process_ack(lnl::net_packet* packet) {
 
         m_pending_packets[pendingIdx].clear(m_peer);
     }
+}
+
+bool lnl::net_reliable_channel::send_next_packets() {
+    if (m_must_send_acks) {
+        m_must_send_acks = false;
+
+        net_mutex_guard guard(m_outgoing_acks_mutex);
+        m_peer->send_user_data(&m_outgoing_acks);
+    }
+
+    auto currentTime = get_current_time();
+    auto hasPendingPackets = false;
+
+    net_mutex_guard guard(m_pending_packets_mutex);
+    while (!m_outgoing_queue.empty()) {
+        auto relate = relative_sequence_number(m_local_sequence, m_local_window_start);
+
+        if (relate >= m_window_size) {
+            break;
+        }
+
+        auto netPacket = m_outgoing_queue.dequeue();
+
+        if (!netPacket) {
+            break;
+        }
+
+        netPacket.value()->set_sequence(m_local_sequence);
+        netPacket.value()->set_channel_id(m_id);
+        m_pending_packets[m_local_sequence % m_window_size].init(*netPacket);
+        m_local_sequence = (m_local_sequence + 1) % net_constants::MAX_SEQUENCE;
+    }
+
+    for (int32_t pendingSeq = m_local_window_start;
+         pendingSeq != m_local_sequence;
+         pendingSeq = (pendingSeq + 1) % net_constants::MAX_SEQUENCE) {
+        if (!m_pending_packets[pendingSeq % m_window_size].try_send(currentTime, m_peer)) {
+            continue;
+        }
+
+        hasPendingPackets = true;
+    }
+
+    return hasPendingPackets || m_must_send_acks || !m_outgoing_queue.empty();
 }
 
 bool lnl::net_reliable_channel::pending_packet::try_send(int64_t currentTime, net_peer* peer) {

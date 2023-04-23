@@ -5,13 +5,13 @@
 #include <type_traits>
 
 namespace lnl {
-    class net_packet_reader final {
+    class net_data_reader final {
         uint8_t* m_data;
         size_t m_size;
         size_t m_position;
     public:
-        net_packet_reader(uint8_t* data, size_t size, size_t position = 0) : m_data(data), m_size(size),
-                                                                             m_position(position) {}
+        net_data_reader(uint8_t* data, size_t size, size_t position = 0) : m_data(data), m_size(size),
+                                                                           m_position(position) {}
 
         template <typename T>
         inline typename std::enable_if<std::is_fundamental<T>::value, bool>::type try_read(T& result) {
