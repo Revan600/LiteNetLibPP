@@ -291,7 +291,7 @@ void lnl::net_manager::on_message_received(lnl::net_packet* packet, net_address&
 
             net_event_create_args broadcastEvent{};
             broadcastEvent.type = NET_EVENT_TYPE::BROADCAST;
-            broadcastEvent.remoteAddr = addr;
+            broadcastEvent.remoteEndpoint = addr;
             broadcastEvent.readerSource = packet;
             create_event(broadcastEvent);
 
@@ -305,7 +305,7 @@ void lnl::net_manager::on_message_received(lnl::net_packet* packet, net_address&
 
             net_event_create_args unconnectedMsgEvent{};
             unconnectedMsgEvent.type = NET_EVENT_TYPE::RECEIVE_UNCONNECTED;
-            unconnectedMsgEvent.remoteAddr = addr;
+            unconnectedMsgEvent.remoteEndpoint = addr;
             unconnectedMsgEvent.readerSource = packet;
             create_event(unconnectedMsgEvent);
 
@@ -445,10 +445,37 @@ int32_t lnl::net_manager::send_raw(const uint8_t* data, size_t offset, size_t le
                          (sockaddr*) &endpoint.raw, sizeof(sockaddr_in));
 
     if (result == SOCKET_ERROR) {
+        auto errorCode = WSAGetLastError();
 #ifndef NDEBUG
-        m_logger.log("sendto failed: %p", WSAGetLastError());
+        m_logger.log("sendto failed: %p", errorCode);
 #endif
-        //todo: implement disconnect and other shit
+        switch (errorCode) {
+            case WSAEHOSTUNREACH:
+            case WSAENETUNREACH: {
+                if (disconnect_on_unreachable) {
+                    auto peer = try_get_peer(endpoint);
+
+                    if (peer) {
+                        disconnect_peer_force(endpoint,
+                                              errorCode == WSAEHOSTUNREACH
+                                              ? DISCONNECT_REASON::HOST_UNREACHABLE
+                                              : DISCONNECT_REASON::NETWORK_UNREACHABLE,
+                                              errorCode, nullptr);
+                    }
+                }
+
+                net_event_create_args args;
+                args.type = NET_EVENT_TYPE::NETWORK_ERROR;
+                args.socketErrorCode = errorCode;
+                args.errorMessage = "Socket error";
+                args.remoteEndpoint = endpoint;
+
+                create_event(args);
+
+                return -1;
+            }
+        }
+
         return 0;
     }
 
@@ -461,7 +488,7 @@ void lnl::net_manager::create_event(net_event_create_args& args) {
     net_event evt(this, args.readerSource);
     ASSIGN_EVT_FIELD(type);
     ASSIGN_EVT_FIELD(peer);
-    ASSIGN_EVT_FIELD(remoteAddr);
+    ASSIGN_EVT_FIELD(remoteEndpoint);
     ASSIGN_EVT_FIELD(socketErrorCode);
     ASSIGN_EVT_FIELD(latency);
     ASSIGN_EVT_FIELD(disconnectReason);
@@ -535,7 +562,7 @@ void lnl::net_manager::process_connect_request(lnl::net_address& addr,
 
     net_event_create_args requestEvent{};
     requestEvent.type = NET_EVENT_TYPE::CONNECTION_REQUEST;
-    requestEvent.remoteAddr = addr;
+    requestEvent.remoteEndpoint = addr;
     requestEvent.connectionRequest = req;
     create_event(requestEvent);
 }

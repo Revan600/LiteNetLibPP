@@ -59,6 +59,7 @@ namespace lnl {
         int32_t max_connect_attempts = 10;
         int32_t ping_interval = 1000;
         bool auto_recycle = true;
+        bool disconnect_on_unreachable = false;
 
         explicit net_manager(net_event_listener* listener);
 
@@ -84,7 +85,7 @@ namespace lnl {
         struct net_event_create_args final {
             NET_EVENT_TYPE type = NET_EVENT_TYPE::CONNECT;
             std::shared_ptr<net_peer> peer;
-            net_address remoteAddr;
+            net_address remoteEndpoint;
             uint32_t socketErrorCode = 0;
             int32_t latency = 0;
             DISCONNECT_REASON disconnectReason = DISCONNECT_REASON::CONNECTION_FAILED;
