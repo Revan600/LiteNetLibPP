@@ -3,9 +3,9 @@ C++ port of the famous networking library [LiteNetLib](https://github.com/Revena
 
 [![Made in Ukraine](https://img.shields.io/badge/made_in-ukraine-ffd700.svg?labelColor=0057b7)](https://stand-with-ukraine.pp.ua)
 ## Build
-As of now, library can be built only with MSVC on Windows. Linux and OS X support is planned in the future releases.
+As of now, library can be built with MSVC on Windows and with GCC on Linux. OS X support is planned in the future releases.
 
-In order to build and run example project use following commands in Powershell:
+In order to build and run example project use following commands in Powershell for Windows:
 
     git clone git@github.com:Revan600/LiteNetLibPP.git
     cd LiteNetLibPP
@@ -14,17 +14,29 @@ In order to build and run example project use following commands in Powershell:
     cmake -G "Visual Studio 17 2022" ../
     cmake --build .
     .\Debug\lnl.exe
-After that you should be able to connect to the test server via localhost:4499
+
+Or in bash for Linux:
+
+    git clone git@github.com:Revan600/LiteNetLibPP.git
+    cd LiteNetLibPP
+    mkdir build
+    cd build
+    cmake ../
+    make
+    ./lnl
+
+After that you should be able to connect to the test server via localhost:4499 (or via your public IP)
 ## Features
 All features of LiteNetLib implemented except of those:
 
- - [ ] NTP
- - [ ] Extra packet layers (and thus, no built-in crc32 and encryption)
- - [ ] IPv6
- - [ ] Connection statistics
- - [ ] UDP NAT hole punching
- - [ ] Packet loss and latency simulation
- - [ ] Only MSVC on Windows is currently supported
+- [ ] NTP
+- [ ] Extra packet layers (and thus, no built-in crc32 and encryption)
+- [ ] IPv6
+- [ ] Connection statistics
+- [ ] UDP NAT hole punching
+- [ ] Packet loss and latency simulation
+- [ ] vcpkg support
+- [x] Only MSVC on Windows is currently supported
 
 ## Performance
 A simple ping-pong with 1000 clients (server benchmark):
@@ -32,15 +44,15 @@ A simple ping-pong with 1000 clients (server benchmark):
 No packet or connection drops were observed during the tests (but I'm sure there would be some bugs, so feel free to fill the issue)
 ## Roadmap
 
- - Implement missing features is number 1 priority
- - Support all major platforms (linux and osx at least)
- - Code cleanup, since this port is almost one-to-one rewrite of the C# version so almost none of C++17 power was used, unfortunately
- - Improve overall performance as there's a lot of room to optimize
- 
- ## Usage
- ### Server
- Here's simple server example which was used in the performance tests
- 
+- Implement missing features is number 1 priority
+- Support all major platforms (linux and osx at least)
+- Code cleanup, since this port is almost one-to-one rewrite of the C# version so almost none of C++17 power was used, unfortunately
+- Improve overall performance as there's a lot of room to optimize
+
+## Usage
+### Server
+Here's simple server example which was used in the performance tests
+
 ```cpp
 #include <lnl/lnl.h>
 
@@ -191,6 +203,6 @@ int main() {
 ```
 
 ## Credits
- - [RevenantX](https://github.com/RevenantX) - the author of the original library
- - [Revan600](https://github.com/Revan600) - me, for porting
+- [RevenantX](https://github.com/RevenantX) - the author of the original library
+- [Revan600](https://github.com/Revan600) - me, for porting
 
