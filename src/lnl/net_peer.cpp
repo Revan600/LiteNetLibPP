@@ -283,9 +283,13 @@ lnl::net_base_channel* lnl::net_peer::create_channel(uint8_t idx) {
         }
     }
 
+#ifdef WIN32
     auto prevChannel = (net_base_channel*) InterlockedCompareExchangePointer((void**) &m_channels[idx], newChannel,
                                                                              nullptr);
-
+#elif __linux__
+    auto prevChannel = (net_base_channel*) __sync_val_compare_and_swap((void**) &m_channels[idx], nullptr,
+                                                                       newChannel);
+#endif
     if (prevChannel && prevChannel != newChannel) {
         delete newChannel;
         return prevChannel;
@@ -728,7 +732,11 @@ void lnl::net_peer::send_internal(uint8_t* data, size_t offset, size_t size, uin
             return;
         }
 
+#ifdef WIN32
         auto currentFragmentId = (uint16_t) InterlockedIncrement((uint32_t*) &m_fragment_id);
+#elif __linux__
+        auto currentFragmentId = (uint16_t) __sync_add_and_fetch((uint32_t*) &m_fragment_id, 1);
+#endif
 
         for (uint16_t partIdx = 0; partIdx < totalPackets; partIdx++) {
             auto sendLength = size > packetDataSize ? packetDataSize : size;

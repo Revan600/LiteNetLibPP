@@ -5,7 +5,17 @@
 #include <thread>
 #include <unordered_map>
 
+#ifdef WIN32
 #include <Winsock2.h>
+#elif __linux__
+
+#include <sys/socket.h>
+
+#define SOCKET int32_t
+#define INVALID_SOCKET (-1)
+#define SOCKET_ERROR (-1)
+
+#endif
 
 #include <lnl/net_logger.h>
 #include <lnl/net_packet.h>
@@ -48,7 +58,11 @@ namespace lnl {
 
         net_event_listener* m_listener;
     public:
+#ifdef WIN32
         bool reuse_address = false;
+#elif __linux__
+        int32_t reuse_address = false;
+#endif
         size_t packet_pool_size = 1000;
         bool broadcast_receive_enabled = false;
         bool unconnected_messages_enabled = false;
@@ -115,7 +129,7 @@ namespace lnl {
 
         size_t get_socket_available_data() const;
 
-        bool socket_poll() const;
+        bool socket_poll();
 
         void receive_logic();
 

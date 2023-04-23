@@ -9,9 +9,9 @@
 
 namespace lnl {
     struct disconnect_info {
-        DISCONNECT_REASON reason;
+        DISCONNECT_REASON reason = DISCONNECT_REASON::CONNECTION_FAILED;
         std::optional<net_data_reader> additional_data;
-        uint32_t socket_error_code;
+        uint32_t socket_error_code = 0;
     };
 
     struct net_event final {

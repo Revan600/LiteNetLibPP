@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <Winsock2.h>
 #include <lnl/net_data_reader.h>
 #include <lnl/net_data_writer.h>
 #include <lnl/net_packet.h>

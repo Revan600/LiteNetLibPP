@@ -3,7 +3,23 @@
 #include <lnl/packets/net_connect_request_packet.h>
 #include <lnl/packets/net_connect_accept_packet.h>
 
+#ifdef WIN32
 #include <MSWSock.h> //for SIO_UDP_CONNRESET
+
+#define GET_SOCK_ERROR WSAGetLastError
+#define IOCTL ioctlsocket
+#elif __linux__
+
+#include <cerrno>
+#include <sys/ioctl.h>
+#include <sys/poll.h>
+
+#define GET_SOCK_ERROR() (errno)
+#define IOCTL ioctl
+#define DWORD uint32_t
+
+#endif
+
 
 lnl::net_manager::net_manager(net_event_listener* listener)
         : m_listener(listener) {
@@ -26,11 +42,16 @@ bool lnl::net_manager::start(uint16_t port) {
     struct sockaddr_in addr{};
     addr.sin_port = htons(port);
     addr.sin_family = AF_INET;
+#ifdef WIN32
     addr.sin_addr.S_un.S_addr = INADDR_ANY;
+#elif __linux__
+    addr.sin_addr.s_addr = INADDR_ANY;
+#endif
     return start(addr);
 }
 
 bool lnl::net_manager::start(const sockaddr_in& addr) {
+#ifdef WIN32
     WSADATA wsaData;
 
     auto result = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -39,11 +60,13 @@ bool lnl::net_manager::start(const sockaddr_in& addr) {
         m_logger.log("WSAStartup failed with error: %p", result);
         return false;
     }
+#endif
 
     m_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
     if (m_socket == INVALID_SOCKET) {
-        m_logger.log("Failed to create socket with error: %p", WSAGetLastError());
+
+        m_logger.log("Failed to create socket with error: %p", GET_SOCK_ERROR());
         return false;
     }
 
@@ -61,10 +84,14 @@ bool lnl::net_manager::start(const sockaddr_in& addr) {
 }
 
 bool lnl::net_manager::bind_socket(const sockaddr_in& addr) {
+#ifdef WIN32
     DWORD timeout = 500;
+#elif __linux__
+    struct timeval timeout{.tv_sec = 0, .tv_usec = 500000};
+#endif
 
     if (!set_socket_option(SOL_SOCKET, SO_RCVTIMEO, timeout)) {
-        m_logger.log("Cannot set SO_RCVTIMEO to %lu", timeout);
+        m_logger.log("Cannot set SO_RCVTIMEO to %lu %i", timeout, GET_SOCK_ERROR());
         return false;
     }
 
@@ -95,28 +122,29 @@ bool lnl::net_manager::bind_socket(const sockaddr_in& addr) {
                  &bytesReturned,
                  nullptr,
                  nullptr) != 0) {
-        m_logger.log("Cannot set SIO_UDP_CONNRESET to false: %p", WSAGetLastError());
+        m_logger.log("Cannot set SIO_UDP_CONNRESET to false: %p", GET_SOCK_ERROR());
         return false;
     }
-#endif
 
     if (!set_socket_option(SOL_SOCKET, SO_EXCLUSIVEADDRUSE, !reuse_address)) {
         m_logger.log("Cannot set SO_EXCLUSIVEADDRUSE to %d", !reuse_address);
         return false;
     }
 
+#endif
+
     if (!set_socket_option(SOL_SOCKET, SO_REUSEADDR, reuse_address)) {
-        m_logger.log("Cannot set SO_REUSEADDR to %d", reuse_address);
+        m_logger.log("Cannot set SO_REUSEADDR to %d %i", reuse_address, GET_SOCK_ERROR());
         return false;
     }
 
     if (!set_socket_option(IPPROTO_IP, IP_TTL, net_constants::SOCKET_TTL)) {
-        m_logger.log("Cannot set IP_TTL to %i", net_constants::SOCKET_TTL);
+        m_logger.log("Cannot set IP_TTL to %i %i", net_constants::SOCKET_TTL, GET_SOCK_ERROR());
         return false;
     }
 
-    if (!set_socket_option(SOL_SOCKET, SO_BROADCAST, true)) {
-        m_logger.log("Cannot set IP_TTL");
+    if (!set_socket_option(SOL_SOCKET, SO_BROADCAST, 1)) {
+        m_logger.log("Cannot set SO_BROADCAST %i", GET_SOCK_ERROR());
         return false;
     }
 
@@ -128,7 +156,7 @@ bool lnl::net_manager::bind_socket(const sockaddr_in& addr) {
 #endif
 
     if (bind(m_socket, (sockaddr*) &addr, sizeof addr) == SOCKET_ERROR) {
-        m_logger.log("Bind failed: %p", WSAGetLastError());
+        m_logger.log("Bind failed: %p", GET_SOCK_ERROR());
         return false;
     }
 
@@ -143,14 +171,19 @@ void lnl::net_manager::receive_logic() {
             continue;
         }
 
+#ifdef WIN32
         auto addrLen = (int) sizeof(addr.raw);
+#elif __linux__
+        socklen_t addrLen = (int) sizeof(addr.raw);
+#endif
         auto packet = pool_get_packet(net_constants::MAX_PACKET_SIZE);
+
         auto size = recvfrom(m_socket,
                              (char*) packet->data(), net_constants::MAX_PACKET_SIZE,
                              0, (sockaddr*) &addr.raw, &addrLen);
 
         if (size == SOCKET_ERROR) {
-            m_logger.log("recvfrom failed: %p", WSAGetLastError());
+            m_logger.log("recvfrom failed: %p", GET_SOCK_ERROR());
             continue;
         }
 
@@ -194,7 +227,7 @@ void lnl::net_manager::update_logic() {
         }
 
         //consider timeBeginPeriod(1) for win32
-        Sleep(sleepTime);
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleepTime));
     }
 }
 
@@ -240,16 +273,16 @@ void lnl::net_manager::pool_recycle(lnl::net_packet* packet) {
 }
 
 size_t lnl::net_manager::get_socket_available_data() const {
-    u_long availableData;
+    u_long availableData = 0;
 
-    if (ioctlsocket(m_socket, FIONREAD, &availableData) == SOCKET_ERROR) {
+    if (IOCTL(m_socket, FIONREAD, &availableData) == SOCKET_ERROR) {
         return 0;
     }
 
     return availableData;
 }
 
-bool lnl::net_manager::socket_poll() const {
+bool lnl::net_manager::socket_poll() {
 #ifdef _WIN32
     fd_set rfds;
     FD_ZERO(&rfds);
@@ -264,8 +297,15 @@ bool lnl::net_manager::socket_poll() const {
 
     return result > 0;
 #else
-    m_logger.log("{0} is not implemented for current platform!", __PRETTY_FUNCTION__);
-    return false;
+    struct pollfd pollfds[1];
+    pollfds[0].fd = m_socket;
+    pollfds[0].events = POLLIN;
+
+    if (poll(pollfds, 1, RECEIVE_POLLING_TIME / 1000) < 0) {
+        return false;
+    }
+
+    return pollfds[0].revents & POLLIN;
 #endif
 }
 
@@ -451,19 +491,28 @@ int32_t lnl::net_manager::send_raw(const uint8_t* data, size_t offset, size_t le
                          (sockaddr*) &endpoint.raw, sizeof(sockaddr_in));
 
     if (result == SOCKET_ERROR) {
-        auto errorCode = WSAGetLastError();
+        auto errorCode = GET_SOCK_ERROR();
 #ifndef NDEBUG
         m_logger.log("sendto failed: %p", errorCode);
 #endif
         switch (errorCode) {
+#ifdef WIN32
             case WSAEHOSTUNREACH:
             case WSAENETUNREACH: {
+#elif __linux__
+            case EHOSTUNREACH:
+            case ENETUNREACH: {
+#endif
                 if (disconnect_on_unreachable) {
                     auto peer = try_get_peer(endpoint);
 
                     if (peer) {
                         disconnect_peer_force(endpoint,
-                                              errorCode == WSAEHOSTUNREACH
+#ifdef WIN32
+                                errorCode == WSAEHOSTUNREACH
+#elif __linux__
+                                              errorCode == EHOSTUNREACH
+                                              #endif
                                               ? DISCONNECT_REASON::HOST_UNREACHABLE
                                               : DISCONNECT_REASON::NETWORK_UNREACHABLE,
                                               errorCode, nullptr);

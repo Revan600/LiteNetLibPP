@@ -4,7 +4,7 @@
 
 namespace lnl {
     class net_stopwatch final {
-        std::chrono::time_point<std::chrono::steady_clock> m_start;
+        std::chrono::time_point<std::chrono::high_resolution_clock> m_start;
 
         decltype(m_start)::duration m_last_time{};
         bool m_running = false;

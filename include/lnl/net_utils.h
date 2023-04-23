@@ -2,12 +2,16 @@
 
 #include <lnl/net_constants.h>
 
-#include <stdarg.h>
+#include <cstdarg>
 #include <string>
 
 #ifdef _WIN32
 
 #include <Windows.h>
+
+#elif __linux__
+
+#include <sys/time.h>
 
 #endif
 
@@ -26,6 +30,9 @@ namespace lnl {
 
     static constexpr int64_t FILE_TIME_OFFSET = DAYS_TO_1601 * TICKS_PER_DAY;
 
+    static constexpr int64_t SECS_TO_100NS = 10000000; /* 10^7 */
+    static constexpr int64_t MICROSECONDS_TO_100NS = 10; /* 1000 / 100 */
+
     static constexpr uint64_t KIND_UTC = 0x4000000000000000;
 
     inline int32_t relative_sequence_number(int32_t number, int32_t expected) {
@@ -39,20 +46,27 @@ namespace lnl {
         GetSystemTimeAsFileTime((FILETIME*) &timestamp);
         return (int64_t) ((timestamp + (FILE_TIME_OFFSET | KIND_UTC)) & 0x3FFFFFFFFFFFFFFF);
 #else
-        static_assert(false);
+        struct timeval time{};
+
+        if (gettimeofday(&time, nullptr) != 0) {
+            // in failure we return 00:00 01 January 1970 UTC (Unix epoch)
+            return 0;
+        }
+
+        return ((int64_t) time.tv_sec) * SECS_TO_100NS + (time.tv_usec * MICROSECONDS_TO_100NS);
 #endif
     }
 
     //https://stackoverflow.com/a/8098080
     inline std::string string_format(const std::string fmt, ...) {
-        int size = ((int)fmt.size()) * 2 + 50;   // Use a rubric appropriate for your code
+        int size = ((int) fmt.size()) * 2 + 50;   // Use a rubric appropriate for your code
         std::string str;
         va_list ap;
         while (1) {     // Maximum two passes on a POSIX system...
             str.resize(size);
-                    va_start(ap, fmt);
-            int n = vsnprintf((char *)str.data(), size, fmt.c_str(), ap);
-                    va_end(ap);
+            va_start(ap, fmt);
+            int n = vsnprintf((char*) str.data(), size, fmt.c_str(), ap);
+            va_end(ap);
             if (n > -1 && n < size) {  // Everything worked
                 str.resize(n);
                 return str;
@@ -64,4 +78,13 @@ namespace lnl {
         }
         return str;
     }
+
+#ifdef __linux__
+
+    template <typename T>
+    T InterlockedExchange(T& data, T&& new_val) {
+        return __sync_lock_test_and_set(&data, new_val);
+    }
+
+#endif
 }

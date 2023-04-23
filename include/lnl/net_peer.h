@@ -11,6 +11,7 @@
 #include <atomic>
 #include <memory>
 #include <unordered_map>
+#include <cmath>
 
 namespace lnl {
     class net_peer {

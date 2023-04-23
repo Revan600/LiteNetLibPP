@@ -2,6 +2,11 @@
 
 #include <lnl/net_packet.h>
 #include <lnl/net_queue.h>
+#include <lnl/net_utils.h>
+
+#ifdef __linux__
+
+#endif
 
 namespace lnl {
     class net_base_channel {
@@ -16,7 +21,11 @@ namespace lnl {
             auto hasPacketsToSend = send_next_packets();
 
             if (!hasPacketsToSend) {
+#ifdef WIN32
                 InterlockedExchange(&m_is_added_to_peer_channel_send_queue, 0);
+#elif __linux__
+                __sync_lock_test_and_set(&m_is_added_to_peer_channel_send_queue, 0);
+#endif
             }
 
             return hasPacketsToSend;

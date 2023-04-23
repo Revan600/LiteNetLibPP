@@ -5,6 +5,12 @@
 #include <vector>
 #include <type_traits>
 
+#ifdef __linux__
+
+#include <cstring>
+
+#endif
+
 #include <lnl/net_constants.h>
 #include <lnl/net_enums.h>
 

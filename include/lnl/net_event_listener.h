@@ -5,7 +5,6 @@
 #include <lnl/net_data_reader.h>
 #include <lnl/net_connection_request.h>
 #include <memory>
-#include <winsock.h>
 
 namespace lnl {
     class net_event_listener {

@@ -1,8 +1,18 @@
 #pragma once
 
-#include <WinSock2.h>
 #include <string>
+
+#ifdef _WIN32
+#include <WinSock2.h>
 #include <WS2tcpip.h>
+#elif __linux__
+
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+
+#endif
 
 namespace lnl {
     struct net_address final {
@@ -37,7 +47,8 @@ namespace lnl {
             raw.sin_port = htons(port);
 
 #ifndef NDEBUG
-            to_string();
+            //just so we can see our address in debugger
+            m_cached_string_representation = to_string();
 #endif
         }
 
@@ -65,9 +76,15 @@ namespace lnl {
         }
 
         bool operator==(const net_address& other) const {
+#ifdef WIN32
             return other.raw.sin_addr.S_un.S_addr == raw.sin_addr.S_un.S_addr &&
                    other.raw.sin_port == raw.sin_port &&
                    other.raw.sin_family == raw.sin_family;
+#elif __linux__
+            return other.raw.sin_addr.s_addr == raw.sin_addr.s_addr &&
+                   other.raw.sin_port == raw.sin_port &&
+                   other.raw.sin_family == raw.sin_family;
+#endif
         }
 
     private:
@@ -77,7 +94,11 @@ namespace lnl {
 
     struct net_address_hash final {
         size_t operator()(const net_address& key) const {
+#ifdef WIN32
             return (uint64_t) key.raw.sin_addr.S_un.S_addr << 32 | key.raw.sin_port; //simply join ip and port
+#elif __linux__
+            return (uint64_t) key.raw.sin_addr.s_addr << 32 | key.raw.sin_port; //simply join ip and port
+#endif
         }
     };
 }

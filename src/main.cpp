@@ -1,4 +1,12 @@
 #include <lnl/lnl.h>
+#include <unistd.h>
+
+#ifdef WIN32
+#include <timeapi.h>
+#include <Windows.h>
+
+#pragma comment(lib, "Winmm.lib")
+#endif
 
 class my_listener : public lnl::net_event_listener {
 public:
@@ -28,13 +36,11 @@ public:
 
         writer.reset();
 
-        printf("%i\n", value);
-
         value++;
 
         writer.write(value);
 
-        peer->send(writer, lnl::DELIVERY_METHOD::RELIABLE_ORDERED);
+        peer->send(writer, lnl::DELIVERY_METHOD::UNRELIABLE);
     }
 
     void on_network_receive_unconnected(const lnl::net_address& endpoint, lnl::net_data_reader& reader,
@@ -56,19 +62,16 @@ public:
 };
 
 int main() {
-    lnl::initialize();
+#ifdef WIN32
+    timeBeginPeriod(1);
+#endif
 
     my_listener listener;
-    lnl::net_manager client(&listener);
-    lnl::net_address address("localhost", 4499);
+    lnl::net_manager server(&listener);
+    server.start(4499);
 
-    lnl::net_data_writer writer;
-
-    client.start();
-    client.connect(address, writer);
-
-    while (client.is_running()) {
-        client.poll_events();
+    while (server.is_running()) {
+        server.poll_events();
     }
 
     return 0;
