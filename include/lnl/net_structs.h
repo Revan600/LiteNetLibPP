@@ -17,7 +17,7 @@ namespace lnl {
     struct net_event final {
         NET_EVENT_TYPE type = NET_EVENT_TYPE::CONNECT;
         std::shared_ptr<class net_peer> peer;
-        net_address remoteAddr;
+        net_address remoteEndpoint;
         uint32_t socketErrorCode = 0;
         int32_t latency = 0;
         DISCONNECT_REASON disconnectReason = DISCONNECT_REASON::CONNECTION_FAILED;

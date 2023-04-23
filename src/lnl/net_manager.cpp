@@ -812,19 +812,19 @@ void lnl::net_manager::process_event(lnl::net_event& event) {
         }
 
         case NET_EVENT_TYPE::RECEIVE_UNCONNECTED: {
-            m_listener->on_network_receive_unconnected(event.remoteAddr, *event.reader,
+            m_listener->on_network_receive_unconnected(event.remoteEndpoint, *event.reader,
                                                        UNCONNECTED_MESSAGE_TYPE::BASIC);
             break;
         }
 
         case NET_EVENT_TYPE::BROADCAST: {
-            m_listener->on_network_receive_unconnected(event.remoteAddr, *event.reader,
+            m_listener->on_network_receive_unconnected(event.remoteEndpoint, *event.reader,
                                                        UNCONNECTED_MESSAGE_TYPE::BASIC);
             break;
         }
 
         case NET_EVENT_TYPE::NETWORK_ERROR: {
-            m_listener->on_network_error(event.remoteAddr, event.socketErrorCode, event.errorMessage.value());
+            m_listener->on_network_error(event.remoteEndpoint, event.socketErrorCode, event.errorMessage.value());
             break;
         }
 
