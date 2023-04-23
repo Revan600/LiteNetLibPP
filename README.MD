@@ -11,9 +11,10 @@ In order to build and run example project use following commands in Powershell f
     cd LiteNetLibPP
     mkdir build
     cd build
-    cmake -G "Visual Studio 17 2022" ../
+    cmake ../
     cmake --build .
-    .\Debug\lnl.exe
+    .\Debug\lnl_example_server.exe
+    .\Debug\lnl_example_client.exe
 
 Or in bash for Linux:
 
@@ -23,7 +24,8 @@ Or in bash for Linux:
     cd build
     cmake ../
     make
-    ./lnl
+    ./lnl_example_server
+    ./lnl_example_client
 
 After that you should be able to connect to the test server via localhost:4499 (or via your public IP)
 ## Features
@@ -51,7 +53,8 @@ No packet or connection drops were observed during the tests (but I'm sure there
 
 ## Usage
 ### Server
-Here's simple server example which was used in the performance tests
+Here's simple client and server example which was used in the performance tests.
+More examples could be found [here](example)
 
 ```cpp
 #include <lnl/lnl.h>
