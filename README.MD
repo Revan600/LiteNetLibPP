@@ -27,7 +27,7 @@ All features of LiteNetLib implemented except of those:
  - [ ] Only MSVC on Windows is currently supported
 
 ## Performance
-A simple ping-pong with 1000 clients (LNL++ as server):
+A simple ping-pong with 1000 clients (server benchmark):
 ![enter image description here](https://github.com/Revan600/LiteNetLibPP/blob/main/assets/lnl_perf.png?raw=true)
 No packet or connection drops were observed during the tests (but I'm sure there would be some bugs, so feel free to fill the issue)
 ## Roadmap
