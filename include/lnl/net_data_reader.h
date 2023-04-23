@@ -14,6 +14,22 @@ namespace lnl {
         net_data_reader(uint8_t* data, size_t size, size_t position = 0) : m_data(data), m_size(size),
                                                                            m_position(position) {}
 
+        [[nodiscard]] const uint8_t* data() const {
+            return m_data;
+        }
+
+        [[nodiscard]] size_t size() const {
+            return m_size;
+        }
+
+        [[nodiscard]] size_t position() const {
+            return m_position;
+        }
+
+        [[nodiscard]] size_t remaining() const {
+            return m_size - m_position;
+        }
+
         template <typename T>
         inline typename std::enable_if<std::is_fundamental<T>::value, bool>::type try_read(T& result) {
             return try_read((uint8_t*) &result, sizeof(T));
