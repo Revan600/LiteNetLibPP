@@ -1,12 +1,5 @@
 #include <lnl/lnl.h>
 
-#ifdef WIN32
-#include <timeapi.h>
-#include <Windows.h>
-
-#pragma comment(lib, "Winmm.lib")
-#endif
-
 class my_listener : public lnl::net_event_listener {
 public:
     void on_peer_connected(std::shared_ptr<lnl::net_peer>& peer) override {
@@ -61,10 +54,6 @@ public:
 };
 
 int main() {
-#ifdef WIN32
-    timeBeginPeriod(1);
-#endif
-
     my_listener listener;
     lnl::net_manager server(&listener);
     server.start(4499);
