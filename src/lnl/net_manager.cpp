@@ -12,8 +12,14 @@ lnl::net_manager::net_manager(net_event_listener* listener)
 
 lnl::net_manager::~net_manager() {
     m_running = false;
-    m_receive_thread.join();
-    m_logic_thread.join();
+
+    if (m_receive_thread.joinable()) {
+        m_receive_thread.join();
+    }
+
+    if (m_logic_thread.joinable()) {
+        m_logic_thread.join();
+    }
 }
 
 bool lnl::net_manager::start(uint16_t port) {
@@ -400,7 +406,7 @@ void lnl::net_manager::on_message_received(lnl::net_packet* packet, net_address&
             if (connAccept && netPeer->process_connect_accept(connAccept)) {
 
                 net_event_create_args connectAcceptEvt{};
-                connectAcceptEvt.type = NET_EVENT_TYPE::RECEIVE_UNCONNECTED;
+                connectAcceptEvt.type = NET_EVENT_TYPE::CONNECT;
                 connectAcceptEvt.peer = netPeer;
 
                 create_event(connectAcceptEvt);
@@ -498,6 +504,11 @@ void lnl::net_manager::create_event(net_event_create_args& args) {
     ASSIGN_EVT_FIELD(errorMessage);
     ASSIGN_EVT_FIELD(userData);
     ASSIGN_EVT_FIELD(reader);
+
+    if (args.readerSource != nullptr && !args.reader) {
+        evt.reader = std::make_optional<net_data_reader>(args.readerSource->data(), args.readerSource->size(),
+                                                         args.readerSource->get_header_size());
+    }
 
 #undef ASSIGN_EVT_FIELD
 
@@ -858,4 +869,41 @@ void lnl::net_manager::create_error_event(uint32_t socketErrorCode, const std::s
     args.errorMessage = errorMessage;
 
     create_event(args);
+}
+
+std::shared_ptr<lnl::net_peer> lnl::net_manager::connect(const lnl::net_address& address,
+                                                         const lnl::net_data_writer& data) {
+    if (!is_running()) {
+        return nullptr;
+    }
+
+    {
+        net_mutex_guard guard(m_connection_requests_mutex);
+        auto it = m_connection_requests.find(address);
+
+        if (it != m_connection_requests.end()) {
+            return nullptr;
+        }
+    }
+
+    uint8_t connectionNumber;
+    net_mutex_guard guard(m_peers_mutex);
+    auto it = m_peers.find(address);
+
+    if (it != m_peers.end()) {
+        switch (it->second->connection_state()) {
+            case CONNECTION_STATE::CONNECTED:
+            case CONNECTION_STATE::OUTGOING: {
+                return it->second;
+            }
+        }
+
+        connectionNumber = (uint8_t) ((it->second->connect_number() + 1) % net_constants::MAX_CONNECTION_NUMBER);
+        remove_peer_internal(address); //we already have mutex locked, so it is okay to call _internal version
+    }
+
+    auto peer = std::make_shared<net_peer>(this, address, get_next_peer_id(), connectionNumber, data);
+    add_peer(peer);
+
+    return peer;
 }

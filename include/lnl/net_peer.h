@@ -94,7 +94,7 @@ namespace lnl {
 
         //connect to constructor
         net_peer(net_manager* netManager, const net_address& endpoint, int32_t id, uint8_t connectNum,
-                 net_data_writer& connectData);
+                 const net_data_writer& connectData);
 
         ~net_peer();
 

@@ -73,6 +73,8 @@ namespace lnl {
 
         bool start(const sockaddr_in& addr);
 
+        std::shared_ptr<net_peer> connect(const net_address& address, const net_data_writer& data);
+
         void poll_events();
 
         net_packet* pool_get_packet(size_t size);

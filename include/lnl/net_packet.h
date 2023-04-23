@@ -49,6 +49,10 @@ namespace lnl {
             set_property(property);
         }
 
+        [[nodiscard]] size_t get_header_size() const {
+            return HEADER_SIZES[m_data[0] & 0x1F];
+        }
+
         void clear() {
             memset(m_data.data(), 0, m_data.size());
         }

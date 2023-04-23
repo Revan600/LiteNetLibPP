@@ -14,6 +14,33 @@ namespace lnl {
 
         explicit net_address(struct sockaddr_in& addr) : raw(addr) {}
 
+        net_address(const std::string& address, uint16_t port) {
+            addrinfo* result;
+
+            if (getaddrinfo(address.c_str(), nullptr, nullptr, &result) != 0) {
+                //todo: log somehow?
+                return;
+            }
+
+            for (auto ptr = result; ptr != nullptr; ptr = ptr->ai_next) {
+                if (ptr->ai_family != AF_INET) {
+                    continue;
+                }
+
+                raw = *(decltype(raw)*) ptr->ai_addr;
+
+                break;
+            }
+
+            freeaddrinfo(result);
+
+            raw.sin_port = htons(port);
+
+#ifndef NDEBUG
+            to_string();
+#endif
+        }
+
         const std::string& address() const {
             if (!m_cached_address.empty()) {
                 return m_cached_address;
@@ -29,8 +56,12 @@ namespace lnl {
             return ntohs(raw.sin_port);
         }
 
-        [[nodiscard]] std::string to_string() const {
-            return address() + ":" + std::to_string(port());
+        [[nodiscard]] const std::string& to_string() const {
+            if (!m_cached_string_representation.empty()) {
+                return m_cached_string_representation;
+            }
+            m_cached_string_representation = address() + ":" + std::to_string(port());
+            return m_cached_string_representation;
         }
 
         bool operator==(const net_address& other) const {
@@ -41,6 +72,7 @@ namespace lnl {
 
     private:
         mutable std::string m_cached_address;
+        mutable std::string m_cached_string_representation;
     };
 
     struct net_address_hash final {

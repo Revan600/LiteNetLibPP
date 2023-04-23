@@ -28,6 +28,8 @@ public:
 
         writer.reset();
 
+        printf("%i\n", value);
+
         value++;
 
         writer.write(value);
@@ -54,12 +56,19 @@ public:
 };
 
 int main() {
-    my_listener listener;
-    lnl::net_manager server(&listener);
-    server.start(4499);
+    lnl::initialize();
 
-    while (true) {
-        server.poll_events();
+    my_listener listener;
+    lnl::net_manager client(&listener);
+    lnl::net_address address("localhost", 4499);
+
+    lnl::net_data_writer writer;
+
+    client.start();
+    client.connect(address, writer);
+
+    while (client.is_running()) {
+        client.poll_events();
     }
 
     return 0;

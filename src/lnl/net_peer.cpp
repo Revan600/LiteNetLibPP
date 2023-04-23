@@ -36,7 +36,7 @@ lnl::net_peer::net_peer(lnl::net_manager* netManager, lnl::net_connection_reques
 }
 
 lnl::net_peer::net_peer(lnl::net_manager* netManager, const lnl::net_address& endpoint, int32_t id, uint8_t connectNum,
-                        net_data_writer& connectData)
+                        const net_data_writer& connectData)
         : net_peer(netManager, endpoint, id) {
     m_connect_time = get_current_time();
     m_connection_state = CONNECTION_STATE::OUTGOING;

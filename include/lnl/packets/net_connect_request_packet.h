@@ -60,9 +60,10 @@ namespace lnl {
             result->set_value_at(net_constants::PROTOCOL_ID, 1);
             result->set_value_at(connectTime, 5);
             result->set_value_at(localId, 13);
-            result->set_value_at(address.raw, net_constants::HEADER_SIZE - 1);
+            result->set_value_at((uint8_t) sizeof(address.raw), net_constants::CONNECT_REQUEST_HEADER_SIZE - 1);
+            result->set_value_at(address.raw, net_constants::CONNECT_REQUEST_HEADER_SIZE);
 
-            result->copy_from(connectData.data(), 0, net_constants::HEADER_SIZE + sizeof(address.raw),
+            result->copy_from(connectData.data(), 0, net_constants::CONNECT_REQUEST_HEADER_SIZE + sizeof(address.raw),
                               connectData.size());
 
             return result;
