@@ -1,5 +1,4 @@
 #include <lnl/lnl.h>
-#include <unistd.h>
 
 #ifdef WIN32
 #include <timeapi.h>
