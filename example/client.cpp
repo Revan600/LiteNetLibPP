@@ -5,38 +5,69 @@
 #endif
 
 class my_listener : public lnl::net_event_listener {
+    int32_t m_received_count = 0;
 public:
     void on_peer_connected(std::shared_ptr<lnl::net_peer>& peer) override {
+        printf("[Client] connected to: %s\n", peer->endpoint().to_string().c_str());
 
+        lnl::net_data_writer dataWriter;
+
+        for (int i = 0; i < 5; ++i) {
+            dataWriter.reset();
+            dataWriter.write(0);
+            dataWriter.write(i);
+            peer->send(dataWriter, lnl::DELIVERY_METHOD::RELIABLE_UNORDERED);
+
+            dataWriter.reset();
+            dataWriter.write(1);
+            dataWriter.write(i);
+            peer->send(dataWriter, lnl::DELIVERY_METHOD::RELIABLE_ORDERED);
+
+            dataWriter.reset();
+            dataWriter.write(2);
+            dataWriter.write(i);
+            peer->send(dataWriter, lnl::DELIVERY_METHOD::SEQUENCED);
+
+            dataWriter.reset();
+            dataWriter.write(3);
+            dataWriter.write(i);
+            peer->send(dataWriter, lnl::DELIVERY_METHOD::UNRELIABLE);
+
+            dataWriter.reset();
+            dataWriter.write(4);
+            dataWriter.write(i);
+            peer->send(dataWriter, lnl::DELIVERY_METHOD::RELIABLE_SEQUENCED);
+        }
+
+        //And test fragment
+        std::vector<uint8_t> testData;
+        testData.resize(13218, 0);
+        testData[0] = 192;
+        testData[13217] = 31;
+        peer->send(testData, lnl::DELIVERY_METHOD::RELIABLE_ORDERED);
     }
 
     void on_peer_disconnected(std::shared_ptr<lnl::net_peer>& peer, lnl::disconnect_info& disconnectInfo) override {
-
+        printf("[Client] disconnected: %i\n", (int32_t) disconnectInfo.reason);
     }
 
     void on_network_error(const lnl::net_address& endpoint, uint32_t socketErrorCode,
                           const std::string& message) override {
-        printf("ERROR: %s\n", message.c_str());
+        printf("[Client] error: %s\n", message.c_str());
     }
 
     void on_network_receive(std::shared_ptr<lnl::net_peer>& peer, lnl::net_data_reader& reader, uint8_t channelNumber,
                             lnl::DELIVERY_METHOD deliveryMethod) override {
-        static lnl::net_data_writer writer;
+        if (reader.size() == 13218) {
+            printf("TestFrag: %i, %i\n", reader.data()[reader.position()], reader.data()[reader.position() + 13217]);
+        } else {
+            auto type = reader.read<int32_t>();
+            auto num = reader.read<int32_t>();
 
-        int32_t value;
+            m_received_count++;
 
-        if (!reader.try_read(value)) {
-            printf("cannot read value\n");
-            return;
+            printf("CNT: %i, TYPE: %i, NUM: %i, MTD: %i\n", m_received_count, type, num, (int32_t) deliveryMethod);
         }
-
-        writer.reset();
-
-        value++;
-
-        writer.write(value);
-
-        peer->send(writer, lnl::DELIVERY_METHOD::UNRELIABLE);
     }
 
     void on_network_receive_unconnected(const lnl::net_address& endpoint, lnl::net_data_reader& reader,

@@ -35,6 +35,13 @@ namespace lnl {
             return try_read((uint8_t*) &result, sizeof(T));
         }
 
+        template <typename T>
+        inline typename std::enable_if<std::is_fundamental<T>::value, T>::type read() {
+            T result;
+            read((uint8_t*) &result, sizeof(T));
+            return result;
+        }
+
         bool try_read(std::string& result) {
             uint16_t sz;
 
@@ -55,6 +62,11 @@ namespace lnl {
             m_position += size;
 
             return true;
+        }
+
+        void read(uint8_t* buffer, size_t size) {
+            memcpy(buffer, &m_data[m_position], size);
+            m_position += size;
         }
 
     private:
