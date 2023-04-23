@@ -127,6 +127,14 @@ namespace lnl {
             send_internal(writer.data(), 0, writer.size(), channelNumber, deliveryMethod, nullptr);
         }
 
+        inline void send(const std::vector<uint8_t>& buffer, DELIVERY_METHOD deliveryMethod) {
+            send(buffer, 0, deliveryMethod);
+        }
+
+        inline void send(const std::vector<uint8_t>& buffer, uint8_t channelNumber, DELIVERY_METHOD deliveryMethod) {
+            send_internal(buffer.data(), 0, buffer.size(), channelNumber, deliveryMethod, nullptr);
+        }
+
     private:
         DISCONNECT_RESULT process_disconnect(net_packet* packet);
 
@@ -181,7 +189,7 @@ namespace lnl {
 
         void update(int32_t deltaTime);
 
-        void send_internal(uint8_t* data, size_t offset, size_t size, uint8_t channelNumber,
+        void send_internal(const uint8_t* data, size_t offset, size_t size, uint8_t channelNumber,
                            DELIVERY_METHOD deliveryMethod, void* userData);
 
         friend class net_manager;

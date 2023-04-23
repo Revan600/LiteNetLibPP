@@ -160,7 +160,7 @@ void lnl::net_peer::process_packet(lnl::net_packet* packet) {
             auto pos = net_constants::HEADER_SIZE;
 
             while (pos < packet->size()) {
-                uint16_t size = *(uint16_t*) &packet->data()[pos];
+                auto size = packet->get_value_at<uint16_t>(pos);
                 pos += 2;
 
                 if (packet->buffer_size() - pos < size) {
@@ -354,6 +354,7 @@ void lnl::net_peer::add_reliable_packet(lnl::DELIVERY_METHOD method, lnl::net_pa
         return;
     }
 
+    uint8_t packetChannel = packet->channel_id();
     uint16_t packetFragId = packet->fragment_id();
 
     auto it = m_holded_fragments.find(packetFragId);
@@ -417,7 +418,7 @@ void lnl::net_peer::add_reliable_packet(lnl::DELIVERY_METHOD method, lnl::net_pa
 
     m_net_manager->create_receive_event(resultingPacket,
                                         method,
-                                        (uint8_t) (packet->channel_id() / net_constants::CHANNEL_TYPE_COUNT),
+                                        (uint8_t) (packetChannel / net_constants::CHANNEL_TYPE_COUNT),
                                         0, m_endpoint);
 }
 
@@ -691,7 +692,7 @@ void lnl::net_peer::update_mtu_logic(int32_t deltaTime) {
     }
 }
 
-void lnl::net_peer::send_internal(uint8_t* data, size_t offset, size_t size, uint8_t channelNumber,
+void lnl::net_peer::send_internal(const uint8_t* data, size_t offset, size_t size, uint8_t channelNumber,
                                   lnl::DELIVERY_METHOD deliveryMethod, void* userData) {
     if (m_connection_state != CONNECTION_STATE::CONNECTED || channelNumber >= m_channels.size()) {
         return;
