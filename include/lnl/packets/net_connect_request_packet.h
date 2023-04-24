@@ -16,12 +16,22 @@ namespace lnl {
         net_address target_address;
         net_data_reader data;
         int32_t peer_id;
+        net_packet* packet;
 
-        net_connect_request_packet(int64_t connectionTime, uint8_t connectionNumber, const net_address& targetAddress,
-                                   const net_data_reader& data, int32_t peerId) : connection_time(connectionTime),
-                                                                                  connection_number(connectionNumber),
-                                                                                  target_address(targetAddress),
-                                                                                  data(data), peer_id(peerId) {}
+        net_connect_request_packet(int64_t connectionTime,
+                                   uint8_t connectionNumber,
+                                   const net_address& targetAddress,
+                                   const net_data_reader& data,
+                                   int32_t peerId,
+                                   net_packet* packet)
+                : connection_time(connectionTime),
+                  connection_number(connectionNumber),
+                  target_address(targetAddress),
+                  data(data),
+                  peer_id(peerId),
+                  packet(packet) {}
+
+        void recycle(class net_manager* manager);
 
         static int32_t get_protocol_id(net_packet* packet) {
             return *(int32_t*) &packet->data()[1];
@@ -46,7 +56,7 @@ namespace lnl {
 
 
             return std::make_unique<net_connect_request_packet>(connectionTime, packet->connection_number(),
-                                                                targetAddress, reader, peerId);
+                                                                targetAddress, reader, peerId, packet);
         }
 
         static net_packet* make(const net_data_writer& connectData, const net_address& address, int64_t connectTime,

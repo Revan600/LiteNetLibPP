@@ -16,6 +16,8 @@ namespace lnl {
             m_ack_packet = std::make_unique<net_packet>(PACKET_PROPERTY::ACK, 0);
         }
 
+        ~net_sequenced_channel() override;
+
         bool process_packet(net_packet* packet) override;
 
     private:

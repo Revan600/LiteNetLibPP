@@ -60,6 +60,11 @@ lnl::net_peer::~net_peer() {
 
         delete channel;
     }
+
+    while (!m_unreliable_channel.empty()) {
+        delete m_unreliable_channel.front();
+        m_unreliable_channel.pop();
+    }
 }
 
 lnl::SHUTDOWN_RESULT lnl::net_peer::shutdown(const std::optional<std::vector<uint8_t>>& rejectData,

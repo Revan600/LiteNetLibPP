@@ -6,7 +6,9 @@
 #include <unordered_map>
 
 #ifdef WIN32
+
 #include <Winsock2.h>
+
 #elif __linux__
 
 #include <sys/socket.h>
@@ -96,6 +98,16 @@ namespace lnl {
         net_packet* pool_get_with_property(PACKET_PROPERTY property, size_t size = 0);
 
         void pool_recycle(net_packet* packet);
+
+        std::shared_ptr<net_peer> first_peer() const {
+            return m_head_peer;
+        }
+
+        inline void disconnect_all() {
+            disconnect_all({}, 0, 0);
+        }
+
+        void disconnect_all(const std::optional<std::vector<uint8_t>>& data, size_t offset, size_t size);
 
     private:
         struct net_event_create_args final {

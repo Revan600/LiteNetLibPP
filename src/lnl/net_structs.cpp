@@ -4,9 +4,11 @@
 void lnl::net_event::recycle() {
     m_recycled = true;
 
-    if (!m_reader_source) {
-        return;
+    if (m_reader_source) {
+        m_manager->pool_recycle(m_reader_source);
     }
 
-    m_manager->pool_recycle(m_reader_source);
+    if (connectionRequest) {
+        connectionRequest->recycle();
+    }
 }

@@ -76,3 +76,7 @@ bool lnl::net_sequenced_channel::send_next_packets() {
 
     return m_last_packet != nullptr;
 }
+
+lnl::net_sequenced_channel::~net_sequenced_channel() {
+    delete m_last_packet;
+}

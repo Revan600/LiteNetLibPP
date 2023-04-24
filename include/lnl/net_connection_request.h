@@ -18,14 +18,20 @@ namespace lnl {
         net_address m_remote_endpoint;
 
         CONNECTION_REQUEST_RESULT m_result = CONNECTION_REQUEST_RESULT::NONE;
-
-    private:
     public:
         net_connection_request(net_manager* listener,
                                std::unique_ptr<net_connect_request_packet>& internalPacket,
                                net_address& remoteEndpoint) : m_listener(listener),
                                                               m_remote_endpoint(remoteEndpoint) {
             m_internal_packet = std::move(internalPacket);
+        }
+
+        void recycle() {
+            if (!m_internal_packet) {
+                return;
+            }
+
+            m_internal_packet->recycle(m_listener);
         }
 
         std::shared_ptr<net_peer> accept_if_key(const std::string& expectedKey);

@@ -13,7 +13,7 @@ namespace lnl {
     public:
         explicit net_base_channel(class net_peer* mPeer) : m_peer(mPeer) {}
 
-        virtual ~net_base_channel() = default;
+        virtual ~net_base_channel();
 
         virtual bool process_packet(net_packet* packet) = 0;
 
@@ -31,10 +31,7 @@ namespace lnl {
             return hasPacketsToSend;
         }
 
-        void add_to_queue(net_packet* packet) {
-            m_outgoing_queue.push(packet);
-            add_to_peer_channel_send_queue();
-        }
+        void add_to_queue(net_packet* packet);
 
     protected:
         virtual bool send_next_packets() = 0;
@@ -43,6 +40,7 @@ namespace lnl {
 
         net_peer* m_peer;
         net_queue<net_packet*> m_outgoing_queue;
+        std::atomic<bool> m_can_enqueue = false;
 
     private:
         uint32_t m_is_added_to_peer_channel_send_queue = 0;
