@@ -221,7 +221,7 @@ void lnl::net_manager::update_logic() {
         stopwatch.restart();
 
         for (auto netPeer = m_head_peer; netPeer; netPeer = netPeer->m_next_peer) {
-            if (netPeer->connection_state() == CONNECTION_STATE::DISCONNECTED ||
+            if (netPeer->connection_state() == CONNECTION_STATE::DISCONNECTED &&
                 netPeer->m_time_since_last_packet > disconnect_timeout) {
                 peersToRemove.push_back(netPeer->m_endpoint);
             } else {
