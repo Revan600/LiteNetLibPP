@@ -38,7 +38,7 @@ All features of LiteNetLib implemented except of those:
 - [ ] UDP NAT hole punching
 - [ ] Packet loss and latency simulation
 - [ ] vcpkg support
-- [x] Only MSVC on Windows is currently supported
+- [x] ~~ Only MSVC on Windows is currently supported ~~
 
 ## Performance
 A simple ping-pong with 1000 clients (server benchmark):
