@@ -1,7 +1,7 @@
 # LiteNetLib++
 C++ port of the famous networking library [LiteNetLib](https://github.com/RevenantX/LiteNetLib) written in C#
 
-[![Made in Ukraine](https://img.shields.io/badge/made_in-ukraine-ffd700.svg?labelColor=0057b7)](https://stand-with-ukraine.pp.ua) ![ctest](actions/workflows/cmake.yml/badge.svg)
+[![Made in Ukraine](https://img.shields.io/badge/made_in-ukraine-ffd700.svg?labelColor=0057b7)](https://stand-with-ukraine.pp.ua) ![ctest](https://github.com/Revan600/LiteNetLibPP/actions/workflows/cmake.yml/badge.svg)
 ## Build
 As of now, library can be built with MSVC on Windows and with GCC on Linux. OS X support is planned in the future releases.
 
