@@ -14,6 +14,7 @@
 #include <cerrno>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
+#include <unistd.h>
 
 #define GET_SOCK_ERROR() (errno)
 #define IOCTL ioctl
@@ -37,6 +38,11 @@ lnl::net_manager::~net_manager() {
     if (m_logic_thread.joinable()) {
         m_logic_thread.join();
     }
+
+    shutdown(m_socket, SHUT_RDWR);
+    close(m_socket);
+
+    m_socket = INVALID_SOCKET;
 
     for (auto& evt: m_events_consume_queue) {
         evt.recycle();
@@ -177,6 +183,13 @@ bool lnl::net_manager::bind_socket(const sockaddr_in& addr) {
 
     if (bind(m_socket, (sockaddr*) &addr, sizeof addr) == SOCKET_ERROR) {
         m_logger.log("Bind failed: %p", GET_SOCK_ERROR());
+        return false;
+    }
+
+    socklen_t bindAddressSize = sizeof(m_bind_address.raw);
+
+    if (getsockname(m_socket, (sockaddr*) &m_bind_address.raw, &bindAddressSize) == SOCKET_ERROR) {
+        m_logger.log("Cannot get bind address: %p", GET_SOCK_ERROR());
         return false;
     }
 

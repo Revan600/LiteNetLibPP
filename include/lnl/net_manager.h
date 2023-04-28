@@ -59,6 +59,8 @@ namespace lnl {
         std::vector<net_event> m_events_produce_queue;
 
         net_event_listener* m_listener;
+
+        net_address m_bind_address;
     public:
 #ifdef WIN32
         bool reuse_address = false;
@@ -76,10 +78,15 @@ namespace lnl {
         int32_t ping_interval = 1000;
         bool auto_recycle = true;
         bool disconnect_on_unreachable = false;
+        std::string name;
 
         explicit net_manager(net_event_listener* listener);
 
         ~net_manager();
+
+        [[nodiscard]] const net_address& address() const {
+            return m_bind_address;
+        }
 
         [[nodiscard]] bool is_running() const {
             return m_running;

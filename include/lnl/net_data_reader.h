@@ -37,8 +37,8 @@ namespace lnl {
 
         template <typename T>
         inline typename std::enable_if<std::is_fundamental<T>::value, T>::type read() {
-            T result;
-            read((uint8_t*) &result, sizeof(T));
+            typename std::remove_const<typename std::remove_reference<T>::type>::type result;
+            read((uint8_t*) &result, sizeof(typename std::remove_const<typename std::remove_reference<T>::type>::type));
             return result;
         }
 

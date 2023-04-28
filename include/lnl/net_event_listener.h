@@ -8,7 +8,7 @@
 
 namespace lnl {
     class net_event_listener {
-    public:
+    protected:
         virtual void on_peer_connected(std::shared_ptr<net_peer>& peer) {};
 
         virtual void on_peer_disconnected(std::shared_ptr<net_peer>& peer, disconnect_info& disconnectInfo) {};
@@ -27,5 +27,7 @@ namespace lnl {
         virtual void on_connection_request(std::shared_ptr<net_connection_request>& request) {};
 
         virtual void on_message_delivered(std::shared_ptr<net_peer>& peer, void* userData) {};
+
+        friend class net_manager;
     };
 }

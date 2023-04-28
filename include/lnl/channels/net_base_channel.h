@@ -11,7 +11,7 @@
 namespace lnl {
     class net_base_channel {
     public:
-        explicit net_base_channel(class net_peer* mPeer) : m_peer(mPeer) {}
+        explicit net_base_channel(class net_peer* peer) : m_peer(peer) {}
 
         virtual ~net_base_channel();
 
@@ -40,7 +40,7 @@ namespace lnl {
 
         net_peer* m_peer;
         net_queue<net_packet*> m_outgoing_queue;
-        std::atomic<bool> m_can_enqueue = false;
+        std::atomic<bool> m_can_enqueue = true;
 
     private:
         uint32_t m_is_added_to_peer_channel_send_queue = 0;

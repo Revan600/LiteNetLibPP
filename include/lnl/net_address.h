@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <cstring>
 
 #ifdef _WIN32
 #include <WinSock2.h>
@@ -25,7 +26,13 @@ namespace lnl {
         explicit net_address(struct sockaddr_in& addr) : raw(addr) {}
 
         net_address(const std::string& address, uint16_t port) {
+            set_address(address);
+            set_port(port);
+        }
+
+        void set_address(const std::string& address) {
             addrinfo* result;
+            auto oldPort = port();
 
             if (getaddrinfo(address.c_str(), nullptr, nullptr, &result) != 0) {
                 //todo: log somehow?
@@ -44,23 +51,23 @@ namespace lnl {
 
             freeaddrinfo(result);
 
-            raw.sin_port = htons(port);
-
-#ifndef NDEBUG
-            //just so we can see our address in debugger
-            m_cached_string_representation = to_string();
-#endif
+            set_port(oldPort);
         }
 
         const std::string& address() const {
-            if (!m_cached_address.empty()) {
+            if (!m_cached_address.empty() && compare_and_update_addr()) {
                 return m_cached_address;
             }
 
             m_cached_address.resize(INET_ADDRSTRLEN + 1, '\0');
             inet_ntop(raw.sin_family, &raw.sin_addr, m_cached_address.data(), m_cached_address.size());
             m_cached_address.erase(m_cached_address.find_last_not_of('\0') + 1, std::string::npos);
+            m_cached_string_representation = {};
             return m_cached_address;
+        }
+
+        void set_port(uint16_t port) {
+            raw.sin_port = htons(port);
         }
 
         [[nodiscard]] uint16_t port() const {
@@ -68,9 +75,10 @@ namespace lnl {
         }
 
         [[nodiscard]] const std::string& to_string() const {
-            if (!m_cached_string_representation.empty()) {
+            if (!m_cached_string_representation.empty() && compare_and_update_addr()) {
                 return m_cached_string_representation;
             }
+            m_cached_address = {};
             m_cached_string_representation = address() + ":" + std::to_string(port());
             return m_cached_string_representation;
         }
@@ -88,8 +96,19 @@ namespace lnl {
         }
 
     private:
+        bool compare_and_update_addr() const {
+            auto result = memcmp(&raw, &m_old_addr, sizeof(raw)) == 0;
+
+            if (!result) {
+                m_old_addr = raw;
+            }
+
+            return result;
+        }
+
         mutable std::string m_cached_address;
         mutable std::string m_cached_string_representation;
+        mutable decltype(raw) m_old_addr{};
     };
 
     struct net_address_hash final {

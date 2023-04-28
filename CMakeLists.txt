@@ -9,9 +9,10 @@ file(GLOB_RECURSE sources
         "include/*.h")
 
 option(BUILD_EXAMPLE "Build the example app" ON)
+option(BUILD_AND_RUN_TESTS "Build and run tests" ON)
 
 add_library(lnl STATIC ${sources})
-target_include_directories(lnl PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(lnl PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if (WIN32)
     add_compile_definitions(WIN32_LEAN_AND_MEAN)
@@ -29,3 +30,6 @@ if (BUILD_EXAMPLE)
     target_include_directories(lnl_example_client PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
     target_link_libraries(lnl_example_client PRIVATE lnl)
 endif ()
+
+enable_testing()
+add_subdirectory(tests)
