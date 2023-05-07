@@ -101,4 +101,22 @@ namespace lnl {
         RECONNECTION,
         NEW_CONNECTION
     };
+
+    enum class NTP_MODE {
+        CLIENT = 3,
+        SERVER = 4
+    };
+
+    enum class NTP_LEAP_INDICATOR {
+        NO_WARNING,
+        LAST_MINUTE_HAS_61_SECONDS,
+        LAST_MINUTE_HAS_59_SECONDS,
+        ALARM_CONDITION
+    };
+
+    enum class DATE_TIME_KIND : uint32_t {
+        UNSPECIFIED = 0,
+        UTC = 1,
+        LOCAL = 2
+    };
 }

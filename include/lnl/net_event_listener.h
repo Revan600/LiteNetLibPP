@@ -4,6 +4,7 @@
 #include <lnl/net_structs.h>
 #include <lnl/net_data_reader.h>
 #include <lnl/net_connection_request.h>
+#include <lnl/ntp/ntp_packet.h>
 #include <memory>
 
 namespace lnl {
@@ -27,6 +28,8 @@ namespace lnl {
         virtual void on_connection_request(std::shared_ptr<net_connection_request>& request) {};
 
         virtual void on_message_delivered(std::shared_ptr<net_peer>& peer, void* userData) {};
+
+        virtual void on_ntp_response(std::shared_ptr<ntp_packet>& packet) {};
 
         friend class net_manager;
     };

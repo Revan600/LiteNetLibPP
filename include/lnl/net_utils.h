@@ -62,7 +62,7 @@ namespace lnl {
         int size = ((int) fmt.size()) * 2 + 50;   // Use a rubric appropriate for your code
         std::string str;
         va_list ap;
-        while (1) {     // Maximum two passes on a POSIX system...
+        while (true) {     // Maximum two passes on a POSIX system...
             str.resize(size);
             va_start(ap, fmt);
             int n = vsnprintf((char*) str.data(), size, fmt.c_str(), ap);
@@ -78,13 +78,4 @@ namespace lnl {
         }
         return str;
     }
-
-#ifdef __linux__
-
-    template <typename T>
-    T InterlockedExchange(T& data, T&& new_val) {
-        return __sync_lock_test_and_set(&data, new_val);
-    }
-
-#endif
 }

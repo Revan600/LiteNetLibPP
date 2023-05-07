@@ -1,3 +1,5 @@
+set(gtest_force_shared_crt on)
+
 include(FetchContent)
 
 FetchContent_Declare(
